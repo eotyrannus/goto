@@ -126,6 +126,7 @@ export const useDesign = create<State>((set, get) => {
         width: entry.width,
         depth: entry.depth,
         height: entry.height,
+        elevation: entry.elevation,
         rotation: 0,
       };
       // Keep a freshly placed item inside the room when it fits.
@@ -151,6 +152,7 @@ export const useDesign = create<State>((set, get) => {
             next.width = Math.min(Math.max(Math.round(next.width), entry.min[0]), entry.max[0]);
             next.depth = Math.min(Math.max(Math.round(next.depth), entry.min[1]), entry.max[1]);
             next.height = Math.min(Math.max(Math.round(next.height), entry.min[2]), entry.max[2]);
+            next.elevation = Math.min(Math.max(Math.round(next.elevation), 0), 5000);
           }
           next.x = Math.round(next.x);
           next.y = Math.round(next.y);

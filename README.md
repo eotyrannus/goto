@@ -14,7 +14,7 @@ Or build it once and serve the static files: `npm run build && npm run preview`.
 ## What it does
 
 - **Room:** set the width, depth, ceiling height and wall thickness in cm, or drag the blue handles on the right and bottom walls.
-- **Heights:** every furniture item has a height (defaults come from the catalog). Doors and windows have a height, and windows also have a sill height. Older saved designs get default heights when opened.
+- **Heights:** every furniture item has a height and a "mounted at" height (e.g. a TV hangs at 100 cm). Defaults come from the catalog. Doors and windows have a height, and windows also have a sill height. Older saved designs get default heights when opened.
 - **Doors and windows:** door, double door, sliding door, window and plain opening. Drag them along a wall or onto another wall. Set the width, hinge side and swing in the side panel, or double-click a door to cycle through hinge/swing options.
 - **Furniture:** 25 plan symbols across six groups (work, meeting, lounge, storage, fixtures, decor). Drag one from the catalog or click to drop it in the middle of the room.
   - Moving snaps to walls, other items' edges and centres, and the grid. Hold Alt to place freely.
@@ -22,7 +22,11 @@ Or build it once and serve the static files: `npm run build && npm run preview`.
 - **Planning aids:** distances from the selected item to each wall, and red highlights for items that overlap, stick out of the room, block a door swing or are taller than the ceiling.
 - **Editing:** multi-select (Shift-click or drag a box), duplicate, copy/paste, lock, front/back ordering, and undo/redo for every change.
 - **Saving:** autosaves as you work. *Designs* lists saved plans with thumbnails and offers starter templates (Focus pod, Duo pod, Meeting pod, Lounge).
-- **Export:** PNG or JPEG with a title block and scale bar, plus `.pod.json` design files for backup or sharing (Export → Import design file).
+- **3D view:** switch between *Plan* and *3D* in the toolbar. The 3D view updates live as you edit and only loads the first time you open it.
+  - Orbit, pan and zoom. Walls between you and the room drop to low stubs so you can see in. *Fit* and *Top* reset the camera.
+  - Click to select, then edit in the side panel. Drag catalog items onto the 3D floor to add them.
+  - *Walk* puts you inside at eye height: drag to look, W A S D or the arrow keys to move, Shift to go faster, Esc to stop. Walls and furniture block you.
+- **Export:** PNG or JPEG of the plan with a title block and scale bar. From the 3D view: a PNG of the current view, or a `.glb` 3D model for other 3D apps. Also `.pod.json` design files for backup or sharing (Export → Import design file).
 
 ### Shortcuts
 
@@ -42,17 +46,18 @@ Or build it once and serve the static files: `npm run build && npm run preview`.
 
 ```
 src/model/      types, furniture catalog, geometry (snapping, wall frames, door swings, SAT overlap),
-                clash detection, templates, unit formatting. Pure TS, unit-tested.
+                clash detection, templates, 3D wall/furniture geometry. Pure TS, unit-tested.
 src/store/      zustand store with undo/redo history; localStorage persistence
 src/canvas/     Konva stage: walls, openings, dimensions, grid, item symbols, transformer, gestures
 src/panels/     toolbar, catalog, properties panel, designs dialog
 src/export/     off-screen PNG/JPEG render with title block; JSON export
+src/view3d/     3D view (react-three-fiber): room, openings, furniture, orbit/walk cameras, export
 e2e/            Playwright tests that drive the real UI with the mouse
 ```
 
 All geometry is in millimetres with the origin at the room's inner top-left corner. The UI shows cm and m.
 
-To add a furniture type, add an entry to `CATALOG` in `src/model/catalog.ts` and a symbol in `src/canvas/symbols/Symbols.tsx`. Symbols are drawn centred on the origin with their back along −y, i.e. against a top wall at rotation 0.
+To add a furniture type, add an entry to `CATALOG` in `src/model/catalog.ts`, a plan symbol in `src/canvas/symbols/Symbols.tsx` and a 3D builder in `src/model/furniture3d.ts`. Symbols are drawn centred on the origin with their back along −y, i.e. against a top wall at rotation 0.
 
 ## Tests
 

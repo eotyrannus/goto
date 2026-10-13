@@ -18,7 +18,7 @@ export function findIssues(design: Design): Map<string, Set<Issue>> {
 
   for (const s of shapes) {
     if (!insideRoom(s.it, design.room)) flag(s.it.id, 'outside');
-    if (s.it.height > design.room.height) flag(s.it.id, 'ceiling');
+    if (s.it.elevation + s.it.height > design.room.height) flag(s.it.id, 'ceiling');
   }
 
   const furniture = shapes.filter((s) => layer(s.it.type) === 'furniture');
@@ -44,5 +44,5 @@ export const ISSUE_TEXT: Record<Issue, string> = {
   outside: 'Sticks out of the room',
   overlap: 'Overlaps other furniture',
   door: 'Blocks a door swing',
-  ceiling: 'Taller than the ceiling',
+  ceiling: 'Reaches above the ceiling',
 };

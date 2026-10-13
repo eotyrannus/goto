@@ -7,7 +7,7 @@ import { uid } from './units';
 
 function item(type: string, x: number, y: number, rotation = 0, size?: [number, number]): FurnitureItem {
   const c = CATALOG_BY_TYPE[type];
-  return { id: uid(), type, x, y, rotation, width: size?.[0] ?? c.width, depth: size?.[1] ?? c.depth, height: c.height };
+  return { id: uid(), type, x, y, rotation, width: size?.[0] ?? c.width, depth: size?.[1] ?? c.depth, height: c.height, elevation: c.elevation };
 }
 
 function opening(kind: Opening['kind'], wall: Opening['wall'], offset: number, width: number, extra: Partial<Opening> = {}): Opening {

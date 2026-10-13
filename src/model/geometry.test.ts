@@ -15,7 +15,7 @@ import { newDesign } from './templates';
 import type { FurnitureItem, Opening } from './types';
 
 const room = { width: 3000, depth: 2000, height: 2500, wallThickness: 100 };
-const item = (p: Partial<FurnitureItem>): FurnitureItem => ({ id: 'a', type: 'desk', x: 500, y: 500, width: 1000, depth: 500, height: 740, rotation: 0, ...p });
+const item = (p: Partial<FurnitureItem>): FurnitureItem => ({ id: 'a', type: 'desk', x: 500, y: 500, width: 1000, depth: 500, height: 740, elevation: 0, rotation: 0, ...p });
 const door = (p: Partial<Opening>): Opening => ({ id: 'd', kind: 'door', wall: 'top', offset: 1000, width: 900, height: 2100, sill: 0, hinge: 'start', swing: 'in', ...p });
 
 describe('item bounds', () => {

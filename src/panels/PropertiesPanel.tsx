@@ -127,7 +127,7 @@ function ItemProps({ it }: { it: FurnitureItem }) {
         <LengthField label="Width" mm={it.width} onChange={(width) => patch({ width })} testId="item-width" />
         <LengthField label="Depth" mm={it.depth} onChange={(depth) => patch({ depth })} testId="item-depth" />
         <LengthField label="Height" mm={it.height} onChange={(height) => patch({ height })} testId="item-height" />
-        <div />
+        <LengthField label="Mounted at" mm={it.elevation} onChange={(elevation) => patch({ elevation })} testId="item-elevation" />
         <LengthField label="X (centre)" mm={it.x} onChange={(x) => patch({ x })} />
         <LengthField label="Y (centre)" mm={it.y} onChange={(y) => patch({ y })} />
       </div>

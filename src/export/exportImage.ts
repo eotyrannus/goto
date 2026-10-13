@@ -123,7 +123,7 @@ export const slug = (name: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '') || 'design';
 
-function download(url: string, filename: string) {
+export function download(url: string, filename: string) {
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;

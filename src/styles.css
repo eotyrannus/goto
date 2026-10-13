@@ -159,3 +159,15 @@ input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color:
   .props { width: 220px; }
   .toolbar .name { width: 130px; }
 }
+
+/* ---- view switch & 3D ---- */
+.segmented { display: flex; background: #f1f3f6; border-radius: 8px; padding: 2px; }
+.segmented button { border: none; background: none; padding: 4px 16px; border-radius: 6px; font-weight: 600; color: var(--muted); }
+.segmented button.on { background: #fff; color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+.view-stack { flex: 1; position: relative; min-width: 0; display: flex; }
+.scene3d { position: absolute; inset: 0; z-index: 5; background: #e9edf2; }
+.scene3d.loading { display: grid; place-items: center; color: var(--muted); }
+.scene3d-controls { position: absolute; right: 12px; bottom: 12px; display: flex; gap: 4px; background: #fff; border-radius: 8px; padding: 4px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+.scene3d-controls button { border: none; }
+.scene3d-hint { position: absolute; left: 12px; bottom: 14px; font-size: 12px; color: #4b5563; background: rgba(255, 255, 255, 0.85); padding: 4px 8px; border-radius: 6px; pointer-events: none; }
+.tip3d { background: #111827; color: #fff; font-size: 11px; padding: 3px 7px; border-radius: 4px; white-space: nowrap; }

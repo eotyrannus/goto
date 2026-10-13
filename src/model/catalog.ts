@@ -16,6 +16,8 @@ export interface CatalogEntry {
   width: number;
   depth: number;
   height: number;
+  /** Default mounting height (underside above the floor). */
+  elevation: number;
   /** [width, depth, height] limits. */
   min: [number, number, number];
   max: [number, number, number];
@@ -30,7 +32,9 @@ const e = (
   layer: ItemLayer = 'furniture',
   min: [number, number] = [200, 200],
   max: [number, number] = [4000, 3000],
+  elevation = 0,
 ): CatalogEntry => ({
+  elevation,
   type,
   name,
   category,
@@ -38,7 +42,8 @@ const e = (
   depth,
   height,
   layer,
-  min: [...min, layer === 'floor' ? 2 : 50],
+  // Heights can shrink to 40% of the default (rugs to 2 mm) — below that the item stops being itself.
+  min: [...min, layer === 'floor' ? 2 : Math.round((height * 0.4) / 10) * 10],
   max: [...max, 3000],
 });
 
@@ -64,8 +69,8 @@ export const CATALOG: CatalogEntry[] = [
   e('sideboard', 'Sideboard', 'Storage', [1600, 450, 800], 'furniture', [400, 300]),
   e('filing-cabinet', 'Filing cabinet', 'Storage', [470, 620, 1300], 'furniture', [300, 400], [1000, 1000]),
 
-  e('whiteboard', 'Whiteboard', 'Fixtures', [1800, 60, 1200], 'furniture', [400, 20], [4000, 200]),
-  e('tv', 'TV / screen', 'Fixtures', [1450, 90, 800], 'furniture', [400, 30], [3000, 400]),
+  e('whiteboard', 'Whiteboard', 'Fixtures', [1800, 60, 1200], 'furniture', [400, 20], [4000, 200], 900),
+  e('tv', 'TV / screen', 'Fixtures', [1450, 90, 800], 'furniture', [400, 30], [3000, 400], 1000),
   e('partition', 'Acoustic panel', 'Fixtures', [1200, 50, 1500], 'furniture', [300, 20], [4000, 200]),
   e('printer', 'Printer', 'Fixtures', [600, 550, 1000], 'furniture', [300, 300], [1500, 1200]),
 

@@ -72,9 +72,11 @@ describe('design store', () => {
     const id = s().design.items[0].id;
     expect(s().design.items[0].height).toBe(740);
     s().updateItems({ [id]: { height: 5 } });
-    expect(s().design.items[0].height).toBe(50);
+    expect(s().design.items[0].height).toBe(300); // 40% of the 74 cm default
     s().addOpening('window');
     expect(s().design.openings[0]).toMatchObject({ height: 1200, sill: 900 });
+    s().addItem('tv');
+    expect(s().design.items[1]).toMatchObject({ height: 800, elevation: 1000 });
   });
 
   it('keeps openings under the ceiling when the room gets lower', () => {

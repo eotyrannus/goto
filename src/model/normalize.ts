@@ -8,7 +8,11 @@ export function normalizeDesign(d: Design): Design {
   return {
     ...d,
     room: { ...d.room, height: d.room.height ?? DEFAULT_ROOM_HEIGHT },
-    items: d.items.map((it) => ({ ...it, height: it.height ?? CATALOG_BY_TYPE[it.type]?.height ?? 750 })),
+    items: d.items.map((it) => ({
+      ...it,
+      height: it.height ?? CATALOG_BY_TYPE[it.type]?.height ?? 750,
+      elevation: it.elevation ?? CATALOG_BY_TYPE[it.type]?.elevation ?? 0,
+    })),
     openings: d.openings.map((o) => ({
       ...o,
       height: o.height ?? OPENING_BY_KIND[o.kind]?.height ?? 2100,

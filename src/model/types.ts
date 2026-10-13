@@ -29,6 +29,8 @@ export interface FurnitureItem {
   width: number;
   depth: number;
   height: number;
+  /** Height of the item's underside above the floor: 0 for free-standing, more for wall-mounted. */
+  elevation: number;
   rotation: number;
   locked?: boolean;
 }

@@ -1,17 +1,22 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { canvasApi, PlanCanvas } from './canvas/PlanCanvas';
 import { thumbnail } from './export/exportImage';
 import { CatalogPanel } from './panels/CatalogPanel';
 import { DesignsDialog } from './panels/DesignsDialog';
 import { PropertiesPanel } from './panels/PropertiesPanel';
-import { Toolbar } from './panels/Toolbar';
+import { Toolbar, type ViewMode } from './panels/Toolbar';
+
 import { useDesign } from './store/designStore';
 import { lastDesignId, loadDesign, saveDesign } from './store/persistence';
+
+// three.js is large; load it only when the 3D view is first opened.
+const Scene3D = lazy(() => import('./view3d/Scene3D'));
 
 function useKeyboardShortcuts() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.closest?.('input, textarea, select, .modal')) return;
+      if (document.body.dataset.walking) return; // walk mode owns the keyboard
       const s = useDesign.getState();
       const mod = e.ctrlKey || e.metaKey;
       const key = e.key.toLowerCase();
@@ -75,14 +80,23 @@ function useAutosave() {
 
 export default function App() {
   const [showDesigns, setShowDesigns] = useState(false);
+  const [view, setView] = useState<ViewMode>('2d');
   const saveState = useAutosave();
   useKeyboardShortcuts();
   return (
     <div className="app">
-      <Toolbar onOpenDesigns={() => setShowDesigns(true)} saveState={saveState} />
+      <Toolbar onOpenDesigns={() => setShowDesigns(true)} saveState={saveState} view={view} onView={setView} />
       <div className="workspace">
         <CatalogPanel />
-        <PlanCanvas />
+        <div className="view-stack">
+          {/* The plan stays mounted under the 3D view so thumbnails and image export keep working. */}
+          <PlanCanvas />
+          {view === '3d' && (
+            <Suspense fallback={<div className="scene3d loading">Loading 3D…</div>}>
+              <Scene3D />
+            </Suspense>
+          )}
+        </div>
         <PropertiesPanel />
       </div>
       {showDesigns && <DesignsDialog onClose={() => setShowDesigns(false)} />}
