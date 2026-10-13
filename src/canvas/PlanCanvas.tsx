@@ -33,6 +33,7 @@ export const canvasApi: { stage: Konva.Stage | null; fit: () => void; zoomBy: (f
 
 const ACCENT = '#2563eb';
 const LAYER_RANK = { floor: 0, furniture: 1, seat: 2 } as const;
+const isFloor = (it: FurnitureItem) => CATALOG_BY_TYPE[it.type]?.layer === 'floor';
 
 type Gesture =
   | { kind: 'pan'; start: Pt; view: View }
@@ -397,6 +398,32 @@ export function PlanCanvas() {
 
   // ----- render -----
 
+  const renderItem = (it: FurnitureItem) => (
+    <Group
+      key={it.id}
+      id={it.id}
+      name="item"
+      ref={(n) => {
+        if (n) nodes.current.set(it.id, n);
+        else nodes.current.delete(it.id);
+      }}
+      x={it.x}
+      y={it.y}
+      rotation={it.rotation}
+      draggable={!it.locked && !panKey}
+      onMouseDown={(e) => onItemDown(e, it)}
+      onTouchStart={(e) => onItemDown(e, it)}
+      onDragStart={() => onDragStart(it)}
+      onDragMove={(e) => onDragMove(e, it)}
+      onDragEnd={onDragEnd}
+      onMouseEnter={() => !panKey && setCursor(it.locked ? 'not-allowed' : 'move')}
+      onMouseLeave={() => !panKey && setCursor('default')}
+    >
+      <FurnitureSymbol type={it.type} w={it.width} d={it.depth} />
+      <Rect x={-it.width / 2} y={-it.depth / 2} width={it.width} height={it.depth} fill="rgba(0,0,0,0)" />
+    </Group>
+  );
+
   const px = (n: number) => n / view.scale; // screen pixels → mm
   const fs = annotationSize(room);
   const selectedOpening = selection?.kind === 'opening' ? design.openings.find((o) => o.id === selection.id) : undefined;
@@ -427,6 +454,8 @@ export function PlanCanvas() {
 
           <Layer name="content">
             <Walls room={room} openings={design.openings} />
+            {/* Rugs go under door leaves and swing arcs; everything else sits on top. */}
+            {ordered.filter(isFloor).map(renderItem)}
             {design.openings.map((o) => {
               const f = openingFrame(room, o);
               return (
@@ -445,31 +474,7 @@ export function PlanCanvas() {
                 </Group>
               );
             })}
-            {ordered.map((it) => (
-              <Group
-                key={it.id}
-                id={it.id}
-                name="item"
-                ref={(n) => {
-                  if (n) nodes.current.set(it.id, n);
-                  else nodes.current.delete(it.id);
-                }}
-                x={it.x}
-                y={it.y}
-                rotation={it.rotation}
-                draggable={!it.locked && !panKey}
-                onMouseDown={(e) => onItemDown(e, it)}
-                onTouchStart={(e) => onItemDown(e, it)}
-                onDragStart={() => onDragStart(it)}
-                onDragMove={(e) => onDragMove(e, it)}
-                onDragEnd={onDragEnd}
-                onMouseEnter={() => !panKey && setCursor(it.locked ? 'not-allowed' : 'move')}
-                onMouseLeave={() => !panKey && setCursor('default')}
-              >
-                <FurnitureSymbol type={it.type} w={it.width} d={it.depth} />
-                <Rect x={-it.width / 2} y={-it.depth / 2} width={it.width} height={it.depth} fill="rgba(0,0,0,0)" />
-              </Group>
-            ))}
+            {ordered.filter((it) => !isFloor(it)).map(renderItem)}
             {items.map((it) => {
               const text = it.label || (settings.showNames ? CATALOG_BY_TYPE[it.type]?.name : '');
               if (!text) return null;
