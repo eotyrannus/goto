@@ -14,9 +14,9 @@ import { findIssues } from './clashes';
 import { newDesign } from './templates';
 import type { FurnitureItem, Opening } from './types';
 
-const room = { width: 3000, depth: 2000, wallThickness: 100 };
-const item = (p: Partial<FurnitureItem>): FurnitureItem => ({ id: 'a', type: 'desk', x: 500, y: 500, width: 1000, depth: 500, rotation: 0, ...p });
-const door = (p: Partial<Opening>): Opening => ({ id: 'd', kind: 'door', wall: 'top', offset: 1000, width: 900, hinge: 'start', swing: 'in', ...p });
+const room = { width: 3000, depth: 2000, height: 2500, wallThickness: 100 };
+const item = (p: Partial<FurnitureItem>): FurnitureItem => ({ id: 'a', type: 'desk', x: 500, y: 500, width: 1000, depth: 500, height: 740, rotation: 0, ...p });
+const door = (p: Partial<Opening>): Opening => ({ id: 'd', kind: 'door', wall: 'top', offset: 1000, width: 900, height: 2100, sill: 0, hinge: 'start', swing: 'in', ...p });
 
 describe('item bounds', () => {
   it('swaps extents when rotated 90°', () => {
@@ -124,6 +124,7 @@ describe('findIssues', () => {
         item({ id: 'd', x: 1400, y: 300, width: 300, depth: 300, type: 'plant' }),
         item({ id: 'rug', x: 600, y: 600, type: 'rug' }),
         item({ id: 'chair', x: 600, y: 700, type: 'office-chair', width: 600, depth: 600 }),
+        item({ id: 'tall', x: 2500, y: 1000, width: 300, depth: 300, height: 2600, type: 'cabinet' }),
       ],
     });
     const issues = findIssues(d);
@@ -131,6 +132,7 @@ describe('findIssues', () => {
     expect([...(issues.get('b') ?? [])]).toContain('overlap');
     expect([...(issues.get('c') ?? [])]).toContain('outside');
     expect([...(issues.get('d') ?? [])]).toContain('door');
+    expect([...(issues.get('tall') ?? [])]).toEqual(['ceiling']);
     expect(issues.has('rug')).toBe(false);
     expect(issues.has('chair')).toBe(false);
   });

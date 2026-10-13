@@ -13,12 +13,13 @@ Or build it once and serve the static files: `npm run build && npm run preview`.
 
 ## What it does
 
-- **Room:** set the width, depth and wall thickness in cm, or drag the blue handles on the right and bottom walls.
+- **Room:** set the width, depth, ceiling height and wall thickness in cm, or drag the blue handles on the right and bottom walls.
+- **Heights:** every furniture item has a height (defaults come from the catalog). Doors and windows have a height, and windows also have a sill height. Older saved designs get default heights when opened.
 - **Doors and windows:** door, double door, sliding door, window and plain opening. Drag them along a wall or onto another wall. Set the width, hinge side and swing in the side panel, or double-click a door to cycle through hinge/swing options.
 - **Furniture:** 25 plan symbols across six groups (work, meeting, lounge, storage, fixtures, decor). Drag one from the catalog or click to drop it in the middle of the room.
   - Moving snaps to walls, other items' edges and centres, and the grid. Hold Alt to place freely.
   - Resize and rotate with the handles (rotation snaps to 45°), or type exact values. Each item type has its own size limits.
-- **Planning aids:** distances from the selected item to each wall, and red highlights for items that overlap, stick out of the room or block a door swing.
+- **Planning aids:** distances from the selected item to each wall, and red highlights for items that overlap, stick out of the room, block a door swing or are taller than the ceiling.
 - **Editing:** multi-select (Shift-click or drag a box), duplicate, copy/paste, lock, front/back ordering, and undo/redo for every change.
 - **Saving:** autosaves as you work. *Designs* lists saved plans with thumbnails and offers starter templates (Focus pod, Duo pod, Meeting pod, Lounge).
 - **Export:** PNG or JPEG with a title block and scale bar, plus `.pod.json` design files for backup or sharing (Export → Import design file).

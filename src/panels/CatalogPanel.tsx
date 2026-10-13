@@ -26,7 +26,7 @@ function OpeningPreview({ entry }: { entry: OpeningEntry }) {
   const t = 100;
   const total = entry.width + 600;
   const s = Math.min((PW - 6) / total, (PH - 10) / (entry.width * 0.55 + t + 200));
-  const o = { id: 'p', kind: entry.kind, wall: 'top' as const, offset: 300, width: entry.width, hinge: 'start' as const, swing: 'in' as const };
+  const o = { id: 'p', kind: entry.kind, wall: 'top' as const, offset: 300, width: entry.width, height: entry.height, sill: entry.sill, hinge: 'start' as const, swing: 'in' as const };
   return (
     <Stage width={PW} height={PH} listening={false}>
       <Layer>

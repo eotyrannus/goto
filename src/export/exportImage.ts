@@ -60,7 +60,7 @@ function titleBlock(design: Design, s: number, width: number, top: number): Konv
     new Konva.Text({
       x: pad,
       y: top + 52,
-      text: `${formatLength(W)} × ${formatLength(D)}  ·  ${formatArea(W * D)}  ·  ${design.items.length} items  ·  ${new Date().toLocaleDateString()}`,
+      text: `${formatLength(W)} × ${formatLength(D)}  ·  ceiling ${formatLength(design.room.height)}  ·  ${formatArea(W * D)}  ·  ${design.items.length} items  ·  ${new Date().toLocaleDateString()}`,
       fontSize: 14,
       fontFamily: FONT,
       fill: '#4b5563',

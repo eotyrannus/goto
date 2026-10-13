@@ -67,6 +67,24 @@ describe('design store', () => {
     expect(s().design.items).toHaveLength(1);
   });
 
+  it('gives new items and openings their catalog heights and clamps edits', () => {
+    s().addItem('desk');
+    const id = s().design.items[0].id;
+    expect(s().design.items[0].height).toBe(740);
+    s().updateItems({ [id]: { height: 5 } });
+    expect(s().design.items[0].height).toBe(50);
+    s().addOpening('window');
+    expect(s().design.openings[0]).toMatchObject({ height: 1200, sill: 900 });
+  });
+
+  it('keeps openings under the ceiling when the room gets lower', () => {
+    s().addOpening('window'); // sill 900 + 1200 tall = top at 2100
+    s().updateRoom({ height: 2000 });
+    const o = s().design.openings[0];
+    expect(s().design.room.height).toBe(2000);
+    expect(o.sill + o.height).toBeLessThanOrEqual(2000);
+  });
+
   it('never deletes locked items', () => {
     s().addItem('desk');
     const id = s().design.items[0].id;

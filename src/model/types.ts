@@ -11,6 +11,10 @@ export interface Opening {
   /** Distance from the left (top/bottom walls) or top (left/right walls) interior corner to the opening's near edge. */
   offset: number;
   width: number;
+  /** Height of the opening itself. */
+  height: number;
+  /** Height of the bottom edge above the floor: 0 for doors, the sill for windows. */
+  sill: number;
   hinge: 'start' | 'end';
   swing: 'in' | 'out';
 }
@@ -24,6 +28,7 @@ export interface FurnitureItem {
   y: number;
   width: number;
   depth: number;
+  height: number;
   rotation: number;
   locked?: boolean;
 }
@@ -31,6 +36,8 @@ export interface FurnitureItem {
 export interface Room {
   width: number;
   depth: number;
+  /** Floor-to-ceiling height. */
+  height: number;
   wallThickness: number;
 }
 

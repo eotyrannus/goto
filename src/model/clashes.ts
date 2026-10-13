@@ -2,9 +2,9 @@ import { CATALOG_BY_TYPE } from './catalog';
 import { boxesIntersect, convexOverlap, doorSwingPolygons, insideRoom, itemBounds, itemCorners } from './geometry';
 import type { Design } from './types';
 
-export type Issue = 'outside' | 'overlap' | 'door';
+export type Issue = 'outside' | 'overlap' | 'door' | 'ceiling';
 
-/** Problems per item id: outside the room, overlapping other furniture, or in a door's swing. */
+/** Problems per item id: outside the room, overlapping other furniture, in a door's swing, or taller than the ceiling. */
 export function findIssues(design: Design): Map<string, Set<Issue>> {
   const issues = new Map<string, Set<Issue>>();
   const flag = (id: string, issue: Issue) => {
@@ -16,7 +16,10 @@ export function findIssues(design: Design): Map<string, Set<Issue>> {
   const solid = design.items.filter((it) => layer(it.type) !== 'floor');
   const shapes = solid.map((it) => ({ it, corners: itemCorners(it), box: itemBounds(it) }));
 
-  for (const s of shapes) if (!insideRoom(s.it, design.room)) flag(s.it.id, 'outside');
+  for (const s of shapes) {
+    if (!insideRoom(s.it, design.room)) flag(s.it.id, 'outside');
+    if (s.it.height > design.room.height) flag(s.it.id, 'ceiling');
+  }
 
   const furniture = shapes.filter((s) => layer(s.it.type) === 'furniture');
   for (let i = 0; i < furniture.length; i++) {
@@ -41,4 +44,5 @@ export const ISSUE_TEXT: Record<Issue, string> = {
   outside: 'Sticks out of the room',
   overlap: 'Overlaps other furniture',
   door: 'Blocks a door swing',
+  ceiling: 'Taller than the ceiling',
 };

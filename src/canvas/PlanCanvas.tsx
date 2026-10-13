@@ -636,7 +636,7 @@ function Clearances({ it, room, px }: { it: FurnitureItem; room: Room; px: (n: n
       <Label x={b.minX} y={b.maxY + px(8)}>
         <Tag fill="#111827" cornerRadius={px(3)} />
         <Text
-          text={`${Math.round(it.width / 10)} × ${Math.round(it.depth / 10)} cm`}
+          text={`${Math.round(it.width / 10)} × ${Math.round(it.depth / 10)} × ${Math.round(it.height / 10)} cm`}
           fontSize={px(11)}
           padding={px(3)}
           fill="#ffffff"

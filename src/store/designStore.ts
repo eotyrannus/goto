@@ -4,6 +4,7 @@ import { clampOpening, itemBounds, nearestWall, wallLength, type Pt } from '../m
 import type { Design, FurnitureItem, Opening, OpeningKind, Room, Selection, Settings } from '../model/types';
 import { uid } from '../model/units';
 import { templates } from '../model/templates';
+import { normalizeDesign } from '../model/normalize';
 
 const HISTORY_LIMIT = 200;
 
@@ -74,7 +75,7 @@ export const useDesign = create<State>((set, get) => {
     selection: null,
     settings: { gridSize: 100, showGrid: true, snap: true, showNames: false, showClearances: true, showClashes: true },
 
-    loadDesign: (d) => set({ design: d, past: [], future: [], selection: null, gestureStart: null }),
+    loadDesign: (d) => set({ design: normalizeDesign(d), past: [], future: [], selection: null, gestureStart: null }),
     commit,
     beginGesture: () => set({ gestureStart: get().design }),
     updateLive: (next) => set({ design: next }),
@@ -106,6 +107,7 @@ export const useDesign = create<State>((set, get) => {
       const room = { ...d.room, ...patch };
       room.width = Math.min(Math.max(Math.round(room.width), 1000), 30000);
       room.depth = Math.min(Math.max(Math.round(room.depth), 1000), 30000);
+      room.height = Math.min(Math.max(Math.round(room.height), 1800), 6000);
       room.wallThickness = Math.min(Math.max(Math.round(room.wallThickness), 20), 500);
       const next = { ...d, room, openings: fitOpenings(room, d.openings) };
       if (live) get().updateLive(next);
@@ -123,6 +125,7 @@ export const useDesign = create<State>((set, get) => {
         y: Math.round(at?.y ?? d.room.depth / 2),
         width: entry.width,
         depth: entry.depth,
+        height: entry.height,
         rotation: 0,
       };
       // Keep a freshly placed item inside the room when it fits.
@@ -147,6 +150,7 @@ export const useDesign = create<State>((set, get) => {
           if (entry) {
             next.width = Math.min(Math.max(Math.round(next.width), entry.min[0]), entry.max[0]);
             next.depth = Math.min(Math.max(Math.round(next.depth), entry.min[1]), entry.max[1]);
+            next.height = Math.min(Math.max(Math.round(next.height), entry.min[2]), entry.max[2]);
           }
           next.x = Math.round(next.x);
           next.y = Math.round(next.y);
@@ -173,6 +177,8 @@ export const useDesign = create<State>((set, get) => {
         wall,
         offset: center - width / 2,
         width,
+        height: entry.height,
+        sill: entry.sill,
         hinge: 'start' as const,
         swing: 'in' as const,
       });

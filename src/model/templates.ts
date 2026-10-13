@@ -1,16 +1,18 @@
 import type { Design, FurnitureItem, Opening } from './types';
-import { CATALOG_BY_TYPE } from './catalog';
+import { CATALOG_BY_TYPE, OPENING_BY_KIND } from './catalog';
+import { DEFAULT_ROOM_HEIGHT } from './normalize';
 import { uid } from './units';
 
 // Rotation to put an item's back against a wall: top 0, right 90, bottom 180, left 270.
 
 function item(type: string, x: number, y: number, rotation = 0, size?: [number, number]): FurnitureItem {
   const c = CATALOG_BY_TYPE[type];
-  return { id: uid(), type, x, y, rotation, width: size?.[0] ?? c.width, depth: size?.[1] ?? c.depth };
+  return { id: uid(), type, x, y, rotation, width: size?.[0] ?? c.width, depth: size?.[1] ?? c.depth, height: c.height };
 }
 
 function opening(kind: Opening['kind'], wall: Opening['wall'], offset: number, width: number, extra: Partial<Opening> = {}): Opening {
-  return { id: uid(), kind, wall, offset, width, hinge: 'start', swing: 'in', ...extra };
+  const { height, sill } = OPENING_BY_KIND[kind];
+  return { id: uid(), kind, wall, offset, width, height, sill, hinge: 'start', swing: 'in', ...extra };
 }
 
 export function newDesign(name: string, width = 3000, depth = 2500, parts: Partial<Design> = {}): Design {
@@ -18,7 +20,7 @@ export function newDesign(name: string, width = 3000, depth = 2500, parts: Parti
     id: uid(),
     name,
     updatedAt: Date.now(),
-    room: { width, depth, wallThickness: 100 },
+    room: { width, depth, height: DEFAULT_ROOM_HEIGHT, wallThickness: 100 },
     openings: [],
     items: [],
     ...parts,

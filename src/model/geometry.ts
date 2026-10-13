@@ -105,11 +105,21 @@ export function frameToWorld(frame: Pt & { rotation: number }, p: Pt): Pt {
   return { x: r.x + frame.x, y: r.y + frame.y };
 }
 
-export function clampOpening<T extends Pick<Opening, 'wall' | 'offset' | 'width'>>(room: Room, o: T): T {
+const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
+
+/** Keep an opening on its wall and, when it has heights, below the ceiling. */
+export function clampOpening<T extends Pick<Opening, 'wall' | 'offset' | 'width'> & Partial<Pick<Opening, 'height' | 'sill'>>>(
+  room: Room,
+  o: T,
+): T {
   const len = wallLength(room, o.wall);
-  const width = Math.min(Math.max(o.width, 300), len);
-  const offset = Math.min(Math.max(o.offset, 0), len - width);
-  return { ...o, width, offset };
+  const width = clamp(o.width, 300, len);
+  const out = { ...o, width, offset: clamp(o.offset, 0, len - width) };
+  if (o.height !== undefined && o.sill !== undefined) {
+    out.sill = clamp(Math.round(o.sill), 0, room.height - 300);
+    out.height = clamp(Math.round(o.height), 300, room.height - out.sill);
+  }
+  return out;
 }
 
 /** Closest wall to a point, with the coordinate along that wall. */
