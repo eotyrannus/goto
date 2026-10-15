@@ -11,6 +11,8 @@ npm run dev          # http://localhost:5173
 
 Or build it once and serve the static files: `npm run build && npm run preview`.
 
+Designs are saved in the browser *for this exact address*, so always open http://localhost:5173. Another port or `127.0.0.1` starts with an empty design list. The dev server refuses to start if 5173 is busy (usually an old copy still running in another terminal); stop that copy with Ctrl+C rather than using a different port. To move designs between browsers or computers, use Export → Design file (.json) and Import.
+
 ## What it does
 
 - **Room:** set the width, depth, ceiling height and wall thickness in cm, or drag the blue handles on the right and bottom walls.
