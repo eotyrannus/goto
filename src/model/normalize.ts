@@ -1,4 +1,4 @@
-import { CATALOG_BY_TYPE, OPENING_BY_KIND } from './catalog';
+import { CATALOG_BY_TYPE, isDoor, OPENING_BY_KIND } from './catalog';
 import { ROOM_COLORS } from './color';
 import type { Design } from './types';
 
@@ -19,12 +19,14 @@ export function normalizeDesign(d: Design): Design {
       height: it.height ?? CATALOG_BY_TYPE[it.type]?.height ?? 750,
       elevation: it.elevation ?? CATALOG_BY_TYPE[it.type]?.elevation ?? 0,
       color: it.color ?? CATALOG_BY_TYPE[it.type]?.color ?? '#f1efea',
+      expandedLength: it.expandedLength ?? CATALOG_BY_TYPE[it.type]?.expandedLength,
     })),
     openings: d.openings.map((o) => ({
       ...o,
       height: o.height ?? OPENING_BY_KIND[o.kind]?.height ?? 2100,
       sill: o.sill ?? OPENING_BY_KIND[o.kind]?.sill ?? 0,
       color: o.color ?? OPENING_BY_KIND[o.kind]?.color ?? '#d8c3a0',
+      material: o.material ?? (isDoor(o.kind) ? 'wood' : undefined),
     })),
   };
 }

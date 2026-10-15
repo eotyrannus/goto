@@ -19,14 +19,22 @@ export function rotate(p: Pt, deg: number): Pt {
   return { x: p.x * c - p.y * s, y: p.x * s + p.y * c };
 }
 
-export function itemCorners(it: Pick<FurnitureItem, 'x' | 'y' | 'width' | 'depth' | 'rotation'>): Pt[] {
+/** Local depth extent [back, front]; an unfolded sofa bed reaches `expandedLength` forward from its back. */
+export function depthExtent(it: Pick<FurnitureItem, 'depth'> & Partial<Pick<FurnitureItem, 'expanded' | 'expandedLength'>>): [number, number] {
+  const back = -it.depth / 2;
+  return [back, it.expanded && it.expandedLength ? back + it.expandedLength : it.depth / 2];
+}
+
+export function itemCorners(
+  it: Pick<FurnitureItem, 'x' | 'y' | 'width' | 'depth' | 'rotation'> & Partial<Pick<FurnitureItem, 'expanded' | 'expandedLength'>>,
+): Pt[] {
   const hw = it.width / 2;
-  const hd = it.depth / 2;
+  const [back, front] = depthExtent(it);
   return [
-    { x: -hw, y: -hd },
-    { x: hw, y: -hd },
-    { x: hw, y: hd },
-    { x: -hw, y: hd },
+    { x: -hw, y: back },
+    { x: hw, y: back },
+    { x: hw, y: front },
+    { x: -hw, y: front },
   ].map((p) => {
     const r = rotate(p, it.rotation);
     return { x: r.x + it.x, y: r.y + it.y };

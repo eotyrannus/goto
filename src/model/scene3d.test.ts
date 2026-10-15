@@ -92,3 +92,15 @@ describe('furniture colours', () => {
     expect(red.some((p) => p.color.toLowerCase() === c.color.toLowerCase())).toBe(false);
   });
 });
+
+describe('sofa bed', () => {
+  it('unfolds to its expanded length and folds back within the sofa footprint', () => {
+    const extent = (parts: ReturnType<typeof furnitureParts>) => Math.max(...parts.map((p) => p.y + p.sy / 2));
+    const folded = furnitureParts('sofa-bed', 2000, 950, 850);
+    expect(extent(folded)).toBeLessThanOrEqual(950 / 2 + 1);
+    const open = furnitureParts('sofa-bed', 2000, 950, 850, undefined, undefined, 2150);
+    const reach = extent(open) + 950 / 2; // measured from the back of the sofa
+    expect(reach).toBeGreaterThan(2050);
+    expect(reach).toBeLessThanOrEqual(2150);
+  });
+});

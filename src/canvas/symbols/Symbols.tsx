@@ -16,6 +16,8 @@ const thin = { stroke: INK, strokeWidth: 0.7, strokeScaleEnabled: false, listeni
 interface P {
   w: number;
   d: number;
+  /** Unfolded sofa beds: depth from the back. */
+  e?: number;
 }
 
 const box = (fill: string, x: number, y: number, w: number, h: number, extra: Record<string, unknown> = {}) => (
@@ -166,6 +168,31 @@ function Sofa({ w, d, seats }: P & { seats?: number }) {
       {cushions}
       <Rect x={-w / 2} y={-d / 2 + back} width={arm} height={d - back} cornerRadius={r} fill={SHADE} {...thin} />
       <Rect x={w / 2 - arm} y={-d / 2 + back} width={arm} height={d - back} cornerRadius={r} fill={SHADE} {...thin} />
+    </Group>
+  );
+}
+
+/** Sofa bed: a sofa when folded; unfolded, a mattress reaching `e` from the back with pillows and a duvet. */
+function SofaBed({ w, d, e }: P) {
+  const fill = useFill();
+  if (!e) return <Sofa w={w} d={d} />;
+  const back = Math.min(220, d * 0.26);
+  const arm = Math.min(200, w * 0.13);
+  const r = Math.min(w, d) * 0.06;
+  const top = -d / 2;
+  const mw = w - 2 * arm - 20;
+  const my0 = top + back;
+  const len = e - back - 20;
+  return (
+    <Group>
+      <Rect x={-w / 2} y={top} width={w} height={d} cornerRadius={r} fill={SHADE} {...line} />
+      <Rect x={-w / 2} y={top + back} width={arm} height={d - back} cornerRadius={r} fill={SHADE} {...thin} />
+      <Rect x={w / 2 - arm} y={top + back} width={arm} height={d - back} cornerRadius={r} fill={SHADE} {...thin} />
+      <Rect x={-mw / 2} y={my0} width={mw} height={len} cornerRadius={r * 0.6} fill="#ffffff" {...line} />
+      <Rect x={-mw / 2 + 40} y={my0 + 60} width={mw / 2 - 60} height={300} cornerRadius={40} fill="#ffffff" {...thin} />
+      <Rect x={20} y={my0 + 60} width={mw / 2 - 60} height={300} cornerRadius={40} fill="#ffffff" {...thin} />
+      <Rect x={-mw / 2 - 15} y={my0 + len * 0.3} width={mw + 30} height={len * 0.7} cornerRadius={20} fill={fill} {...thin} />
+      <Line points={[-mw / 2 - 15, my0 + len * 0.3 + 120, mw / 2 + 15, my0 + len * 0.3 + 120]} {...thin} />
     </Group>
   );
 }
@@ -331,6 +358,7 @@ const SYMBOLS: Record<string, (p: P) => ReactElement> = {
   chair: Chair,
   stool: Stool,
   sofa: (p) => <Sofa {...p} />,
+  'sofa-bed': SofaBed,
   armchair: (p) => <Sofa {...p} seats={1} />,
   'coffee-table': CoffeeTable,
   'side-table': SideTable,
@@ -351,11 +379,11 @@ const SYMBOLS: Record<string, (p: P) => ReactElement> = {
 /** Mix a colour towards white so plan fills stay pale enough for linework to read. */
 export const planTint = (color: string, amount = 0.7) => (isHex(color) ? shade(color, amount) : FILL);
 
-export function FurnitureSymbol({ type, w, d, color }: { type: string; w: number; d: number; color?: string }) {
+export function FurnitureSymbol({ type, w, d, color, expandedLength }: { type: string; w: number; d: number; color?: string; expandedLength?: number }) {
   const S = SYMBOLS[type] ?? Fallback;
   return (
     <FillContext.Provider value={color ? planTint(color) : FILL}>
-      <S w={w} d={d} />
+      <S w={w} d={d} e={expandedLength} />
     </FillContext.Provider>
   );
 }

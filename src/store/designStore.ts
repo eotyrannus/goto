@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { CATALOG_BY_TYPE, OPENING_BY_KIND } from '../model/catalog';
+import { CATALOG_BY_TYPE, isDoor, OPENING_BY_KIND } from '../model/catalog';
 import { clampOpening, itemBounds, nearestWall, wallLength, type Pt } from '../model/geometry';
 import type { Design, FurnitureItem, Opening, OpeningKind, Room, Selection, Settings } from '../model/types';
 import { uid } from '../model/units';
@@ -40,6 +40,8 @@ interface State {
   deleteSelection: () => void;
   duplicateSelection: () => void;
   rotateSelection: (deg: number) => void;
+  /** Fold or unfold a sofa bed. */
+  toggleExpanded: (id: string) => void;
   nudgeSelection: (dx: number, dy: number) => void;
   reorderSelection: (where: 'front' | 'back') => void;
   copySelection: () => void;
@@ -129,6 +131,7 @@ export const useDesign = create<State>((set, get) => {
         height: entry.height,
         elevation: entry.elevation,
         color: entry.color,
+        ...(entry.expandedLength !== undefined ? { expandedLength: entry.expandedLength, expanded: false } : {}),
         rotation: 0,
       };
       // Keep a freshly placed item inside the room when it fits.
@@ -155,6 +158,10 @@ export const useDesign = create<State>((set, get) => {
             next.depth = Math.min(Math.max(Math.round(next.depth), entry.min[1]), entry.max[1]);
             next.height = Math.min(Math.max(Math.round(next.height), entry.min[2]), entry.max[2]);
             next.elevation = Math.min(Math.max(Math.round(next.elevation), 0), 5000);
+            if (entry.expandedLength !== undefined) {
+              // An unfolded bed must reach further than the folded sofa.
+              next.expandedLength = Math.min(Math.max(Math.round(next.expandedLength ?? entry.expandedLength), next.depth + 200), 3500);
+            }
           }
           next.x = Math.round(next.x);
           next.y = Math.round(next.y);
@@ -185,6 +192,7 @@ export const useDesign = create<State>((set, get) => {
         height: entry.height,
         sill: entry.sill,
         color: entry.color,
+        material: isDoor(kind) ? ('wood' as const) : undefined,
         hinge: 'start' as const,
         swing: 'in' as const,
       });
@@ -238,6 +246,12 @@ export const useDesign = create<State>((set, get) => {
       const items = get().design.items.filter((it) => ids.includes(it.id) && !it.locked);
       if (!items.length) return;
       get().updateItems(Object.fromEntries(items.map((it) => [it.id, { rotation: it.rotation + deg }])));
+    },
+
+    toggleExpanded: (id) => {
+      const it = get().design.items.find((x) => x.id === id);
+      if (!it || it.expandedLength === undefined) return;
+      get().updateItems({ [id]: { expanded: !it.expanded } });
     },
 
     nudgeSelection: (dx, dy) => {

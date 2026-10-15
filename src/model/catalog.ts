@@ -1,5 +1,5 @@
 import { COLORS } from './furniture3d';
-import type { OpeningKind } from './types';
+import type { DoorMaterial, OpeningKind } from './types';
 
 /**
  * How an item takes part in clash checks:
@@ -21,6 +21,8 @@ export interface CatalogEntry {
   elevation: number;
   /** Default main colour; must match the colour the 3D builder uses for the item's main parts. */
   color: string;
+  /** Unfolding items (sofa beds): default depth from the back when unfolded. */
+  expandedLength?: number;
   /** [width, depth, height] limits. */
   min: [number, number, number];
   max: [number, number, number];
@@ -58,6 +60,7 @@ const MAIN_COLOR: Record<string, string> = {
   chair: COLORS.fabricWarm,
   stool: COLORS.wood,
   sofa: COLORS.fabric,
+  'sofa-bed': COLORS.fabric,
   armchair: COLORS.fabric,
   'coffee-table': COLORS.wood,
   'side-table': COLORS.wood,
@@ -85,6 +88,7 @@ export const CATALOG: CatalogEntry[] = [
   e('stool', 'Stool', 'Meeting', [400, 400, 650], 'seat', [250, 250], [700, 700]),
 
   e('sofa', 'Sofa', 'Lounge', [2000, 850, 800], 'furniture', [1200, 600]),
+  { ...e('sofa-bed', 'Sofa bed', 'Lounge', [2000, 950, 850], 'furniture', [1400, 800]), expandedLength: 2150 },
   e('armchair', 'Armchair', 'Lounge', [850, 850, 800], 'furniture', [500, 500], [1400, 1400]),
   e('coffee-table', 'Coffee table', 'Lounge', [1000, 550, 420], 'furniture', [300, 300]),
   e('side-table', 'Side table', 'Lounge', [450, 450, 550], 'furniture', [250, 250], [900, 900]),
@@ -127,3 +131,12 @@ export const OPENINGS: OpeningEntry[] = [
 ];
 
 export const OPENING_BY_KIND = Object.fromEntries(OPENINGS.map((o) => [o.kind, o])) as Record<OpeningKind, OpeningEntry>;
+
+export const isDoor = (kind: OpeningKind) => kind === 'door' || kind === 'double-door' || kind === 'sliding-door';
+
+export const DOOR_MATERIALS: { id: DoorMaterial; name: string; color: string }[] = [
+  { id: 'wood', name: 'Wood', color: COLORS.door },
+  { id: 'glass', name: 'Glass', color: COLORS.aluminium },
+  { id: 'wood-glass', name: 'Wood with glass centre', color: COLORS.door },
+  { id: 'aluminium-glass', name: 'Aluminium with glass centre', color: COLORS.aluminium },
+];

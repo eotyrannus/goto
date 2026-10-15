@@ -6,7 +6,8 @@ import { shade } from './color';
 // floor (or on its mounting height for wall-mounted items).
 
 export interface Part {
-  shape: 'box' | 'cyl' | 'sphere';
+  /** rbox: a box with rounded edges (radius), for upholstery. */
+  shape: 'box' | 'rbox' | 'cyl' | 'sphere';
   /** Centre. */
   x: number;
   y: number;
@@ -20,6 +21,12 @@ export interface Part {
   taper?: number;
   /** Light-emitting look (lamp shades, screens). */
   glow?: boolean;
+  /** rbox only: edge radius (mm). */
+  radius?: number;
+  /** Lean the part's top backwards (towards -y) by this many degrees, e.g. back cushions. */
+  tilt?: number;
+  /** Cylinders only: lay the cylinder along the x or y axis instead of standing it up. */
+  axis?: 'x' | 'y';
 }
 
 export const COLORS = {
@@ -38,6 +45,7 @@ export const COLORS = {
   felt: '#a7a196',
   shade: '#fbf3dd',
   door: '#d8c3a0',
+  aluminium: '#aeb4bb',
 };
 
 const box = (x: number, y: number, z: number, sx: number, sy: number, sz: number, color: string, extra: Partial<Part> = {}): Part => ({
@@ -71,6 +79,20 @@ const sphere = (x: number, y: number, z: number, dx: number, dy: number, dz: num
   sy: dy,
   sz: dz,
   color,
+});
+
+const rbox = (x: number, y: number, z: number, sx: number, sy: number, sz: number, color: string, radius: number, extra: Partial<Part> = {}): Part => ({
+  shape: 'rbox',
+  x,
+  y,
+  z,
+  sx,
+  sy,
+  sz,
+  color,
+  // A radius can't exceed half the smallest side.
+  radius: Math.max(1, Math.min(radius, sx / 2 - 1, sy / 2 - 1, sz / 2 - 1)),
+  ...extra,
 });
 
 /** Four legs inset from the corners of a w×d footprint, from the floor up to `top`. */
@@ -174,24 +196,86 @@ function sideTable(w: number, d: number, h: number): Part[] {
   return [cyl(0, 0, h - 14, w, d, 28, COLORS.wood), cyl(0, 0, (h - 28) / 2, 50, 50, h - 28, COLORS.dark), cyl(0, 0, 10, w * 0.6, d * 0.6, 20, COLORS.dark)];
 }
 
-function sofa(w: number, d: number, h: number, seats?: number): Part[] {
-  const back = Math.min(220, d * 0.26);
-  const arm = Math.min(200, w * 0.13);
-  const baseH = h * 0.32;
-  const seatW = w - 2 * arm;
-  const n = seats ?? Math.max(1, Math.round(seatW / 650));
+const CUSHION = '#9db0c2'; // derived: a lighter shade of the sofa's colour
+const PILLOW = '#6f86a0'; // derived: a darker shade for throw pillows
+
+/** Shared upholstered shell: tapered legs, base, rolled arms and back frame. */
+function sofaShell(w: number, d: number, h: number) {
+  const legH = Math.min(110, h * 0.14);
+  const arm = Math.min(190, w * 0.12);
+  const backD = Math.min(180, d * 0.21);
+  const baseH = h * 0.28;
+  const armTop = h * 0.74;
+  const seatTop = legH + baseH;
   const parts: Part[] = [
-    box(0, 0, 60 + baseH / 2, w, d, baseH, COLORS.fabric),
-    box(0, -d / 2 + back / 2, 60 + (h - 60) / 2, w, back, h - 60, COLORS.fabric),
-    box(-w / 2 + arm / 2, back / 2, 60 + (h * 0.72 - 60) / 2, arm, d - back, h * 0.72 - 60, COLORS.fabric),
-    box(w / 2 - arm / 2, back / 2, 60 + (h * 0.72 - 60) / 2, arm, d - back, h * 0.72 - 60, COLORS.fabric),
-    ...legs(w, d, 60, 40, 60, COLORS.woodDark),
+    // Tapered wooden legs, wider at the top.
+    ...[
+      [-w / 2 + 70, -d / 2 + 70],
+      [w / 2 - 70, -d / 2 + 70],
+      [w / 2 - 70, d / 2 - 70],
+      [-w / 2 + 70, d / 2 - 70],
+    ].map(([x, y]) => cyl(x, y, legH / 2, 42, 42, legH, COLORS.woodDark, { taper: 1.5 })),
+    rbox(0, 0, legH + baseH / 2, w - 10, d - 20, baseH, COLORS.fabric, 35),
+    rbox(0, -d / 2 + backD / 2, legH + (h - legH) / 2, w - 2 * arm + 40, backD, h - legH, COLORS.fabric, 45),
   ];
-  const cushionD = d - back - 30;
-  for (let i = 0; i < n; i++) {
-    const cx = -seatW / 2 + (seatW * (i + 0.5)) / n;
-    parts.push(box(cx, -d / 2 + back + cushionD / 2, 60 + baseH + 60, seatW / n - 16, cushionD, 120, '#9db0c2'));
+  for (const side of [-1, 1]) {
+    const x = side * (w / 2 - arm / 2);
+    parts.push(
+      rbox(x, 0, legH + (armTop - legH - arm * 0.35) / 2, arm, d, armTop - legH - arm * 0.35, COLORS.fabric, 40),
+      // A rolled top along the full depth of the arm.
+      cyl(x, 0, armTop - arm * 0.5, arm * 1.04, d - 8, arm, COLORS.fabric, { axis: 'y' }),
+    );
   }
+  return { parts, legH, arm, backD, seatTop, seatW: w - 2 * arm };
+}
+
+function sofa(w: number, d: number, h: number, seats?: number): Part[] {
+  const { parts, backD, seatTop, seatW } = sofaShell(w, d, h);
+  const n = seats ?? Math.max(1, Math.round(seatW / 650));
+  const cw = seatW / n;
+  const seatD = d - backD - 30;
+  const seatH = Math.min(160, h * 0.2);
+  const backH = Math.max(h - seatTop - seatH - 40, 120);
+  for (let i = 0; i < n; i++) {
+    const cx = -seatW / 2 + cw * (i + 0.5);
+    parts.push(
+      rbox(cx, -d / 2 + backD + seatD / 2, seatTop + seatH / 2, cw - 14, seatD, seatH, CUSHION, 60),
+      rbox(cx, -d / 2 + backD + 70, seatTop + seatH + backH / 2, cw - 18, 150, backH, CUSHION, 65, { tilt: 11 }),
+    );
+  }
+  // Throw pillows in the corners of anything wider than an armchair.
+  if (n > 1) {
+    const ps = Math.min(400, cw * 0.55);
+    for (const side of [-1, 1]) {
+      parts.push(rbox(side * (seatW / 2 - ps / 2 - 30), -d / 2 + backD + 190, seatTop + seatH + ps / 2 - 30, ps, 110, ps, PILLOW, 50, { tilt: 20 }));
+    }
+  }
+  return parts;
+}
+
+/** Folded it's a sofa; unfolded, a mattress on a metal frame reaches `expandedLength` from the back. */
+function sofaBed(w: number, d: number, h: number, expandedLength?: number): Part[] {
+  if (!expandedLength) return sofa(w, d, h);
+  const { parts, backD, seatTop, seatW } = sofaShell(w, d, h);
+  const y0 = -d / 2 + backD + 10;
+  const y1 = -d / 2 + expandedLength - 20;
+  const top = Math.min(seatTop + 90, 470);
+  const mh = 150;
+  const mw = seatW - 20;
+  const len = y1 - y0;
+  parts.push(
+    // Metal frame and fold-out legs under the far end.
+    box(0, (y0 + y1) / 2 + 40, top - mh - 15, mw - 40, len - 80, 20, COLORS.metal),
+    cyl(-mw / 2 + 60, y1 - 60, (top - mh - 25) / 2, 30, 30, top - mh - 25, COLORS.metal),
+    cyl(mw / 2 - 60, y1 - 60, (top - mh - 25) / 2, 30, 30, top - mh - 25, COLORS.metal),
+    rbox(0, (y0 + y1) / 2, top - mh / 2, mw, len, mh, '#f4f2ee', 45),
+    // Duvet over the lower two thirds, pillows at the head.
+    rbox(0, y0 + len * 0.62, top + 25, mw + 30, len * 0.68, 60, CUSHION, 30),
+    rbox(-mw / 4, y0 + 220, top + 55, mw / 2 - 60, 320, 120, '#ffffff', 55),
+    rbox(mw / 4, y0 + 220, top + 55, mw / 2 - 60, 320, 120, '#ffffff', 55),
+    // Back cushions stay up.
+    rbox(0, -d / 2 + backD + 70, top + 200, seatW - 18, 150, 380, CUSHION, 65, { tilt: 11 }),
+  );
   return parts;
 }
 
@@ -315,6 +399,7 @@ const BUILDERS: Record<string, (w: number, d: number, h: number) => Part[]> = {
   chair,
   stool,
   sofa: (w, d, h) => sofa(w, d, h),
+  'sofa-bed': (w, d, h) => sofaBed(w, d, h),
   armchair: (w, d, h) => sofa(w, d, h, 1),
   'coffee-table': coffeeTable,
   'side-table': sideTable,
@@ -334,7 +419,8 @@ const BUILDERS: Record<string, (w: number, d: number, h: number) => Part[]> = {
 
 /** Colours derived from an item's main colour (sofa cushions, the rug's centre panel). */
 const DERIVED: Record<string, number> = {
-  '#9db0c2': 0.18, // sofa cushions: a lighter shade
+  [CUSHION]: 0.18, // sofa cushions: a lighter shade
+  [PILLOW]: -0.18, // throw pillows: a darker shade
   '#a58fb3': -0.1, // rug centre panel: a darker shade
 };
 
@@ -342,9 +428,19 @@ const DERIVED: Record<string, number> = {
  * Parts for an item. `color` recolours the item's main parts — those drawn in its catalog
  * default colour `main` — and the details derived from it; other details keep their colours.
  */
-export function furnitureParts(type: string, w: number, d: number, h: number, color?: string, main?: string): Part[] {
+export function furnitureParts(
+  type: string,
+  w: number,
+  d: number,
+  h: number,
+  color?: string,
+  main?: string,
+  /** Unfolded sofa beds: depth from the back. */
+  expandedLength?: number,
+): Part[] {
   const build = BUILDERS[type];
-  let parts = build ? build(w, d, h) : [box(0, 0, h / 2, w, d, h, COLORS.white)];
+  let parts =
+    type === 'sofa-bed' ? sofaBed(w, d, h, expandedLength) : build ? build(w, d, h) : [box(0, 0, h / 2, w, d, h, COLORS.white)];
   if (color && main && color.toLowerCase() !== main.toLowerCase()) {
     parts = parts.map((p) => {
       if (p.color.toLowerCase() === main.toLowerCase()) return { ...p, color };

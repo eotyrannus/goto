@@ -28,6 +28,19 @@ describe('item bounds', () => {
   });
 });
 
+describe('expanded items', () => {
+  it('reach forward from their back by the expanded length', () => {
+    const bed = item({ x: 1000, y: 500, width: 2000, depth: 900, expanded: true, expandedLength: 2100 });
+    const b = itemBounds(bed);
+    expect(b.minY).toBeCloseTo(50);
+    expect(b.maxY).toBeCloseTo(2150);
+    // Rotated 180° (against the bottom wall) it unfolds upwards.
+    const flipped = itemBounds({ ...bed, rotation: 180 });
+    expect(flipped.maxY).toBeCloseTo(950);
+    expect(flipped.minY).toBeCloseTo(-1150);
+  });
+});
+
 describe('convexOverlap', () => {
   const sq = (x: number, y: number, s = 10) => [
     { x, y },

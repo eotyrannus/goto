@@ -5,6 +5,7 @@ import { CATALOG_BY_TYPE } from '../model/catalog';
 import { findIssues } from '../model/clashes';
 import {
   boundsOf,
+  depthExtent,
   frameToWorld,
   itemBounds,
   itemCorners,
@@ -199,7 +200,8 @@ export function PlanCanvas() {
     if (g?.kind !== 'drag') return;
     const node = e.target;
     const proposed = node.position();
-    const b = itemBounds({ ...it, x: 0, y: 0 });
+    // Snap on the folded footprint so the box stays centred on the item's origin.
+    const b = itemBounds({ ...it, x: 0, y: 0, expanded: false });
     const free = !settings.snap || (e.evt as MouseEvent).altKey;
     let pos: Pt = proposed;
     let newGuides: SnapResult['guides'] = [];
@@ -416,11 +418,19 @@ export function PlanCanvas() {
       onDragStart={() => onDragStart(it)}
       onDragMove={(e) => onDragMove(e, it)}
       onDragEnd={onDragEnd}
+      onDblClick={() => it.expandedLength !== undefined && store().toggleExpanded(it.id)}
       onMouseEnter={() => !panKey && setCursor(it.locked ? 'not-allowed' : 'move')}
       onMouseLeave={() => !panKey && setCursor('default')}
     >
-      <FurnitureSymbol type={it.type} w={it.width} d={it.depth} color={settings.colorPlan ? it.color : undefined} />
-      <Rect x={-it.width / 2} y={-it.depth / 2} width={it.width} height={it.depth} fill="rgba(0,0,0,0)" />
+      <FurnitureSymbol
+        type={it.type}
+        w={it.width}
+        d={it.depth}
+        color={settings.colorPlan ? it.color : undefined}
+        expandedLength={it.expanded ? it.expandedLength : undefined}
+      />
+      {/* Invisible hit area: the whole footprint, including an unfolded bed. */}
+      <Rect x={-it.width / 2} y={depthExtent(it)[0]} width={it.width} height={depthExtent(it)[1] - depthExtent(it)[0]} fill="rgba(0,0,0,0)" />
     </Group>
   );
 

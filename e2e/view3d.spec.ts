@@ -157,3 +157,58 @@ test('colours: items, doors, walls and floor', async ({ page }) => {
   expect((await design(page)).room.wallColor).toBe('#333333');
   expect(await page.evaluate(() => (window as any).__pod.store.getState().past.length)).toBe(before + 1);
 });
+
+test('door material dropdown swaps material and its usual colour', async ({ page }) => {
+  await open3d(page, 'Focus pod');
+  const door = (await design(page)).openings.find((o: any) => o.kind === 'door');
+  expect(door.material).toBe('wood');
+  await page.evaluate((id) => (window as any).__pod.store.getState().setSelection({ kind: 'opening', id }), door.id);
+  await page.getByTestId('door-material').selectOption('aluminium-glass');
+  let o = (await design(page)).openings.find((x: any) => x.id === door.id);
+  expect(o).toMatchObject({ material: 'aluminium-glass', color: '#aeb4bb' });
+  await page.getByTestId('door-material').selectOption('glass');
+  // A custom colour survives material changes.
+  await page.getByLabel('Colour #2f3237').click();
+  await page.getByTestId('door-material').selectOption('wood-glass');
+  o = (await design(page)).openings.find((x: any) => x.id === door.id);
+  expect(o).toMatchObject({ material: 'wood-glass', color: '#2f3237' });
+  // Still clickable open/shut with a glass panel.
+  const at = await page.evaluate((id) => (window as any).__pod.three.project(id), door.id);
+  await page.mouse.click(at.x, at.y);
+  expect(await page.evaluate((id) => (window as any).__pod.three.doorShut(id), door.id)).toBe(true);
+});
+
+test('sofa bed unfolds by button and double-click, and its footprint grows', async ({ page }) => {
+  await open3d(page, 'Empty room');
+  await page.getByTestId('catalog-item:sofa-bed').click();
+  let bed = (await design(page)).items[0];
+  expect(bed).toMatchObject({ type: 'sofa-bed', expanded: false, expandedLength: 2150 });
+
+  await page.getByTestId('toggle-expanded').click();
+  expect((await design(page)).items[0].expanded).toBe(true);
+  await expect(page.getByTestId('toggle-expanded')).toHaveText('Fold sofa');
+
+  // Expanded length can't be shorter than the folded sofa.
+  await page.getByTestId('item-expanded-length').fill('50');
+  await page.getByTestId('item-expanded-length').press('Enter');
+  bed = (await design(page)).items[0];
+  expect(bed.expandedLength).toBe(bed.depth + 200);
+
+  // Double-click in 3D folds it back up.
+  const at = await page.evaluate((id) => (window as any).__pod.three.project(id), bed.id);
+  await page.mouse.dblclick(at.x, at.y);
+  expect((await design(page)).items[0].expanded).toBe(false);
+
+  // On the plan, double-click unfolds; an unfolded bed that hits a wall is flagged.
+  await page.getByTestId('view-2d').click();
+  await page.evaluate((id) => (window as any).__pod.store.getState().updateItems({ [id]: { y: 2000, expandedLength: 2150 } }), bed.id);
+  const p = await page.evaluate(({ x, y }) => {
+    const stage = (window as any).__pod.canvas.stage;
+    const box = stage.container().getBoundingClientRect();
+    const t = stage.getAbsoluteTransform().point({ x, y });
+    return { x: box.left + t.x, y: box.top + t.y };
+  }, { x: bed.x, y: 2000 });
+  await page.mouse.dblclick(p.x, p.y);
+  expect((await design(page)).items[0].expanded).toBe(true);
+  await expect(page.getByTestId('properties')).toContainText('Sticks out of the room');
+});

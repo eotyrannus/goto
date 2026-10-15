@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { CATALOG_BY_TYPE, OPENING_BY_KIND, OPENINGS } from '../model/catalog';
+import { CATALOG_BY_TYPE, DOOR_MATERIALS, isDoor, OPENING_BY_KIND, OPENINGS } from '../model/catalog';
 import { findIssues, ISSUE_TEXT } from '../model/clashes';
 import { wallLength } from '../model/geometry';
-import type { FurnitureItem, Opening, Wall } from '../model/types';
+import type { DoorMaterial, FurnitureItem, Opening, Wall } from '../model/types';
 import { cmToMm, formatArea, mmToCm } from '../model/units';
 import { ROOM_COLORS } from '../model/color';
 import { useDesign } from '../store/designStore';
@@ -194,6 +194,7 @@ function RoomProps() {
         <dt>Space+drag</dt><dd>Pan (or middle mouse)</dd>
         <dt>Wheel</dt><dd>Zoom</dd>
         <dt>Dbl-click door</dt><dd>Flip swing / hinge</dd>
+        <dt>Dbl-click sofa bed</dt><dd>Fold / unfold</dd>
       </dl>
     </>
   );
@@ -223,6 +224,16 @@ function ItemProps({ it }: { it: FurnitureItem }) {
           <button onClick={() => patch({ rotation: it.rotation + 90 })} title="Rotate 90°">⟳</button>
         </div>
       </div>
+      {it.expandedLength !== undefined && (
+        <div className="grid2 align-end">
+          <LengthField label="Expanded length" mm={it.expandedLength} onChange={(expandedLength) => patch({ expandedLength })} testId="item-expanded-length" />
+          <div className="btn-row">
+            <button className={it.expanded ? 'active' : ''} onClick={() => s.toggleExpanded(it.id)} data-testid="toggle-expanded">
+              {it.expanded ? 'Fold sofa' : 'Unfold bed'}
+            </button>
+          </div>
+        </div>
+      )}
       <ColorField label="Colour" value={it.color} defaultColor={entry?.color} onChange={(color, live) => s.updateItems({ [it.id]: { color } }, live)} testId="item-color" />
       {entry && (
         <p className="hint">
@@ -257,7 +268,7 @@ function OpeningProps({ o }: { o: Opening }) {
   const s = useDesign();
   const room = s.design.room;
   const patch = (p: Partial<Opening>) => s.updateOpening(o.id, p);
-  const isDoor = o.kind === 'door' || o.kind === 'double-door';
+  const hinged = o.kind === 'door' || o.kind === 'double-door';
   return (
     <>
       <h2>{OPENINGS.find((x) => x.kind === o.kind)?.name}</h2>
@@ -270,7 +281,7 @@ function OpeningProps({ o }: { o: Opening }) {
             const kind = e.target.value as Opening['kind'];
             const { height, sill, color } = OPENING_BY_KIND[kind];
             const customColour = o.color !== OPENING_BY_KIND[o.kind].color;
-            patch({ kind, height, sill, ...(customColour ? {} : { color }) });
+            patch({ kind, height, sill, ...(customColour ? {} : { color }), material: isDoor(kind) ? (o.material ?? 'wood') : undefined });
           }}
         >
           {OPENINGS.map((x) => (
@@ -286,6 +297,26 @@ function OpeningProps({ o }: { o: Opening }) {
           ))}
         </select>
       </label>
+      {isDoor(o.kind) && (
+        <label className="field">
+          <span>Material</span>
+          <select
+            data-testid="door-material"
+            value={o.material ?? 'wood'}
+            onChange={(e) => {
+              const material = e.target.value as DoorMaterial;
+              // Swap in the new material's usual colour unless the user picked their own.
+              const prevDefault = DOOR_MATERIALS.find((m) => m.id === (o.material ?? 'wood'))?.color;
+              const nextDefault = DOOR_MATERIALS.find((m) => m.id === material)!.color;
+              patch({ material, ...(o.color === prevDefault ? { color: nextDefault } : {}) });
+            }}
+          >
+            {DOOR_MATERIALS.map((m) => (
+              <option key={m.id} value={m.id}>{m.name}</option>
+            ))}
+          </select>
+        </label>
+      )}
       <div className="grid2">
         <LengthField label="Width" mm={o.width} onChange={(width) => patch({ width })} testId="opening-width" />
         <LengthField label={o.wall === 'top' || o.wall === 'bottom' ? 'From left' : 'From top'} mm={o.offset} onChange={(offset) => patch({ offset })} />
@@ -298,15 +329,15 @@ function OpeningProps({ o }: { o: Opening }) {
       </div>
       {o.kind !== 'opening' && (
         <ColorField
-          label={o.kind === 'window' ? 'Frame colour' : 'Door colour'}
+          label={o.kind === 'window' ? 'Frame colour' : o.material === 'glass' ? 'Fittings colour' : o.material?.endsWith('glass') ? 'Frame colour' : 'Door colour'}
           value={o.color}
-          defaultColor={OPENING_BY_KIND[o.kind].color}
+          defaultColor={isDoor(o.kind) ? DOOR_MATERIALS.find((m) => m.id === (o.material ?? 'wood'))!.color : OPENING_BY_KIND[o.kind].color}
           onChange={(color, live) => s.updateOpening(o.id, { color }, live)}
           testId="opening-color"
         />
       )}
       <p className="hint">Wall length {mmToCm(wallLength(room, o.wall))} cm. Drag along the wall to move; drag to another wall to re-hang.</p>
-      {isDoor && (
+      {hinged && (
         <div className="grid2">
           {o.kind === 'door' && (
             <label className="field">

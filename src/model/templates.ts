@@ -1,5 +1,5 @@
 import type { Design, FurnitureItem, Opening } from './types';
-import { CATALOG_BY_TYPE, OPENING_BY_KIND } from './catalog';
+import { CATALOG_BY_TYPE, isDoor, OPENING_BY_KIND } from './catalog';
 import { ROOM_COLORS } from './color';
 import { DEFAULT_ROOM_HEIGHT } from './normalize';
 import { uid } from './units';
@@ -13,7 +13,8 @@ function item(type: string, x: number, y: number, rotation = 0, size?: [number, 
 
 function opening(kind: Opening['kind'], wall: Opening['wall'], offset: number, width: number, extra: Partial<Opening> = {}): Opening {
   const { height, sill, color } = OPENING_BY_KIND[kind];
-  return { id: uid(), kind, wall, offset, width, height, sill, color, hinge: 'start', swing: 'in', ...extra };
+  const material = isDoor(kind) ? ('wood' as const) : undefined;
+  return { id: uid(), kind, wall, offset, width, height, sill, color, material, hinge: 'start', swing: 'in', ...extra };
 }
 
 export function newDesign(name: string, width = 3000, depth = 2500, parts: Partial<Design> = {}): Design {

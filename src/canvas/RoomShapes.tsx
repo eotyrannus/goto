@@ -70,7 +70,7 @@ export function OpeningSymbol({ o, t }: { o: Opening; t: number }) {
         <Line
           key={`leaf${i}`}
           points={[leaf.hinge.x, leaf.hinge.y, leaf.open.x, leaf.open.y]}
-          stroke={INK}
+          stroke={o.material === 'glass' || o.material === 'aluminium-glass' || o.material === 'wood-glass' ? '#4a86b8' : INK}
           strokeWidth={2}
           strokeScaleEnabled={false}
           listening={false}

@@ -2,13 +2,14 @@ import { Edges, Html, OrbitControls } from '@react-three/drei';
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { memo, useEffect, useMemo, useRef, useState, type DragEvent, type RefObject } from 'react';
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { DND_MIME } from '../canvas/PlanCanvas';
 import { CATALOG_BY_TYPE } from '../model/catalog';
 import { findIssues } from '../model/clashes';
 import { furnitureParts, type Part } from '../model/furniture3d';
-import { itemBounds, openingFrame, frameToWorld } from '../model/geometry';
-import type { Design, FurnitureItem, Opening, OpeningKind, Room, Wall } from '../model/types';
+import { depthExtent, itemBounds, openingFrame, frameToWorld } from '../model/geometry';
+import type { Design, DoorMaterial, FurnitureItem, Opening, OpeningKind, Room, Wall } from '../model/types';
 import { DOOR_OPEN, doorLeafSegments, wallBlocks, type Block } from '../model/walls3d';
 import { useDesign } from '../store/designStore';
 import { scene3dApi } from './api';
@@ -49,6 +50,20 @@ function material(color: string, glow = false) {
   return materials.get(key)!;
 }
 const GLASS = new THREE.MeshPhysicalMaterial({ color: '#cfe3f1', transparent: true, opacity: 0.28, roughness: 0.05, depthWrite: false });
+/** Door glass reads a little stronger than window glass so the door is visible when shut. */
+const DOOR_GLASS = new THREE.MeshPhysicalMaterial({ color: '#b9d3e6', transparent: true, opacity: 0.42, roughness: 0.05, depthWrite: false });
+const metals = new Map<string, THREE.MeshStandardMaterial>();
+function metal(color: string) {
+  if (!metals.has(color)) metals.set(color, new THREE.MeshStandardMaterial({ color, roughness: 0.32, metalness: 0.65 }));
+  return metals.get(color)!;
+}
+/** Rounded boxes are built at their real size (in metres) so edge radii stay round. */
+const rounded = new Map<string, RoundedBoxGeometry>();
+function roundedBox(sx: number, sy: number, sz: number, r: number) {
+  const key = [sx, sy, sz, r].map((v) => v.toFixed(4)).join('|');
+  if (!rounded.has(key)) rounded.set(key, new RoundedBoxGeometry(sx, sy, sz, 4, r));
+  return rounded.get(key)!;
+}
 
 /** Box in plan coordinates (mm). */
 function blockProps(b: Pick<Block, 'x0' | 'x1' | 'y0' | 'y1' | 'z0' | 'z1'>) {
@@ -207,21 +222,18 @@ function Door3D({ room, o }: { room: Room; o: Opening }) {
   const toggle = useDoors((s) => s.toggle);
   const step = useEased(shut ? 0 : 1);
   const leaves = useRef<(THREE.Group | null)[]>([]);
-  const sliding = useRef<THREE.Mesh>(null);
+  const sliding = useRef<THREE.Group>(null);
   const t = room.wallThickness;
   const f = openingFrame(room, o);
-  const mat = material(o.color);
+  const kind = o.material ?? 'wood';
+  const panelThick = Math.min(40, t * 0.2);
 
   useFrame((_, dt) => {
     const amount = step(dt);
     if (o.kind === 'sliding-door') {
       // The inner panel slides along the wall behind the fixed one.
-      const shift = 0.45 * amount;
-      const a = frameToWorld(f, { x: o.width * shift, y: -t * 0.7 });
-      const b = frameToWorld(f, { x: o.width * (0.55 + shift), y: -t * 0.5 });
-      const p = blockProps({ x0: Math.min(a.x, b.x), x1: Math.max(a.x, b.x), y0: Math.min(a.y, b.y), y1: Math.max(a.y, b.y), z0: 0, z1: o.height });
-      sliding.current?.position.set(...p.position);
-      sliding.current?.scale.set(...p.scale);
+      const p = frameToWorld(f, { x: o.width * 0.45 * amount, y: -t * 0.6 });
+      sliding.current?.position.set(p.x * M, 0, p.y * M);
       return;
     }
     doorLeafSegments(room, o, amount * DOOR_OPEN).forEach((leaf, i) => {
@@ -245,14 +257,18 @@ function Door3D({ room, o }: { room: Room; o: Opening }) {
     onPointerOut: () => (document.body.style.cursor = ''),
   };
 
+  const along = (-f.rotation * Math.PI) / 180;
   if (o.kind === 'sliding-door') {
-    const fixedA = frameToWorld(f, { x: o.width * 0.45, y: -t * 0.5 });
-    const fixedB = frameToWorld(f, { x: o.width, y: -t * 0.3 });
-    const fixed = { x0: Math.min(fixedA.x, fixedB.x), x1: Math.max(fixedA.x, fixedB.x), y0: Math.min(fixedA.y, fixedB.y), y1: Math.max(fixedA.y, fixedB.y), z0: 0, z1: o.height };
+    const fixed = frameToWorld(f, { x: o.width * 0.45, y: -t * 0.4 });
+    const panel = <DoorPanel len={o.width * 0.55} height={o.height} thick={panelThick} kind={kind} color={o.color} sliding />;
     return (
       <group name={`door-${o.id}`} {...handlers}>
-        <mesh geometry={BOX} material={mat} {...blockProps(fixed)} castShadow />
-        <mesh ref={sliding} geometry={BOX} material={mat} castShadow />
+        <group position={[fixed.x * M, 0, fixed.y * M]} rotation-y={along}>
+          {panel}
+        </group>
+        <group ref={sliding} rotation-y={along}>
+          {panel}
+        </group>
       </group>
     );
   }
@@ -261,26 +277,87 @@ function Door3D({ room, o }: { room: Room; o: Opening }) {
     <group name={`door-${o.id}`} {...handlers}>
       {doorLeafSegments(room, o).map((_, i) => (
         <group key={i} ref={(g) => void (leaves.current[i] = g)}>
-          <mesh geometry={BOX} material={mat} position={[(len / 2) * M, ((o.height - 10) / 2) * M, 0]} scale={[len * M, (o.height - 10) * M, 40 * M]} castShadow />
-          <mesh geometry={BOX} material={material('#5b5b5b')} position={[len * 0.88 * M, 1.0, 0]} scale={[0.12, 0.02, 0.07]} />
+          <DoorPanel len={len} height={o.height - 10} thick={40} kind={kind} color={o.color} />
         </group>
       ))}
     </group>
   );
 }
 
+/**
+ * One door leaf in its own frame: x runs 0..len from the hinge (or panel edge), y is up, z is
+ * through the leaf. `kind` picks the build: solid wood, frameless glass, or a wood or aluminium
+ * frame around a glass centre. `color` is the wood / frame colour.
+ */
+function DoorPanel({ len, height, thick, kind, color, sliding = false }: { len: number; height: number; thick: number; kind: DoorMaterial; color: string; sliding?: boolean }) {
+  const part = (x0: number, x1: number, y0: number, y1: number, mat: THREE.Material, depth = thick) => (
+    <mesh
+      geometry={BOX}
+      material={mat}
+      position={[((x0 + x1) / 2) * M, ((y0 + y1) / 2) * M, 0]}
+      scale={[(x1 - x0) * M, (y1 - y0) * M, depth * M]}
+      castShadow
+    />
+  );
+  const lever = <mesh geometry={BOX} material={metal('#5b5f66')} position={[len * 0.88 * M, 1.0, 0]} scale={[0.12, 0.02, (thick + 50) * M]} />;
+  const pull = (
+    <mesh geometry={cylinder()} material={metal('#c3c8ce')} position={[len * 0.9 * M, 1.05, 0]} scale={[0.025, 0.5, (thick + 70) * M]} />
+  );
+  if (kind === 'wood') {
+    return (
+      <>
+        {part(0, len, 0, height, material(color))}
+        {!sliding && lever}
+      </>
+    );
+  }
+  if (kind === 'glass') {
+    // Frameless toughened glass with small patch fittings and a long bar handle.
+    return (
+      <>
+        {part(2, len - 2, 2, height - 2, DOOR_GLASS, 12)}
+        {part(0, 140, 0, 70, metal(color), 24)}
+        {part(0, 140, height - 70, height, metal(color), 24)}
+        {pull}
+      </>
+    );
+  }
+  const frameMat = kind === 'aluminium-glass' ? metal(color) : material(color);
+  const stile = kind === 'aluminium-glass' ? 55 : 110;
+  const bottom = kind === 'aluminium-glass' ? 95 : 220;
+  return (
+    <>
+      {part(0, stile, 0, height, frameMat)}
+      {part(len - stile, len, 0, height, frameMat)}
+      {part(stile, len - stile, height - stile, height, frameMat)}
+      {part(stile, len - stile, 0, bottom, frameMat)}
+      {part(stile, len - stile, bottom, height - stile, DOOR_GLASS, 10)}
+      {!sliding && (kind === 'aluminium-glass' ? pull : lever)}
+    </>
+  );
+}
+
 // ---------- furniture ----------
 
-const PartMesh = ({ p }: { p: Part }) => (
-  <mesh
-    geometry={p.shape === 'box' ? BOX : p.shape === 'sphere' ? SPHERE : cylinder(p.taper)}
-    material={material(p.color, p.glow)}
-    position={[p.x * M, p.z * M, p.y * M]}
-    scale={[p.sx * M, p.sz * M, p.sy * M]}
-    castShadow
-    receiveShadow
-  />
-);
+function PartMesh({ p }: { p: Part }) {
+  const common = { material: material(p.color, p.glow), castShadow: true, receiveShadow: true };
+  const position: [number, number, number] = [p.x * M, p.z * M, p.y * M];
+  if (p.shape === 'rbox') {
+    // Built at real size; tilt leans the top towards the back (-y on the plan, -Z here).
+    return <mesh {...common} geometry={roundedBox(p.sx * M, p.sz * M, p.sy * M, (p.radius ?? 20) * M)} position={position} rotation-x={-THREE.MathUtils.degToRad(p.tilt ?? 0)} />;
+  }
+  if (p.shape === 'cyl' && p.axis) {
+    // Cylinders stand on Y; lay them along the plan's x or y axis.
+    return p.axis === 'y' ? (
+      <mesh {...common} geometry={cylinder(p.taper)} position={position} rotation-x={Math.PI / 2} scale={[p.sx * M, p.sy * M, p.sz * M]} />
+    ) : (
+      <mesh {...common} geometry={cylinder(p.taper)} position={position} rotation-z={Math.PI / 2} scale={[p.sz * M, p.sx * M, p.sy * M]} />
+    );
+  }
+  return (
+    <mesh {...common} geometry={p.shape === 'box' ? BOX : p.shape === 'sphere' ? SPHERE : cylinder(p.taper)} position={position} scale={[p.sx * M, p.sz * M, p.sy * M]} />
+  );
+}
 
 const Item3D = memo(function Item3D({
   it,
@@ -296,12 +373,23 @@ const Item3D = memo(function Item3D({
   interactive: boolean;
 }) {
   const parts = useMemo(
-    () => furnitureParts(it.type, it.width, it.depth, it.height, it.color, CATALOG_BY_TYPE[it.type]?.color),
-    [it.type, it.width, it.depth, it.height, it.color],
+    () =>
+      furnitureParts(it.type, it.width, it.depth, it.height, it.color, CATALOG_BY_TYPE[it.type]?.color, it.expanded ? it.expandedLength : undefined),
+    [it.type, it.width, it.depth, it.height, it.color, it.expanded, it.expandedLength],
   );
   const s = useDesign.getState;
+  const unfolds = it.expandedLength !== undefined;
+  const [back, front] = depthExtent(it);
   const onClick = (e: ThreeEvent<MouseEvent>) => {
-    if (!interactive || e.delta > 5) return;
+    if (e.delta > 5) return;
+    if (!interactive) {
+      // Walking: there's no selection, so a click folds or unfolds a sofa bed.
+      if (unfolds) {
+        e.stopPropagation();
+        s().toggleExpanded(it.id);
+      }
+      return;
+    }
     e.stopPropagation();
     const st = s();
     const current = st.selection?.kind === 'items' ? st.selection.ids : [];
@@ -317,6 +405,11 @@ const Item3D = memo(function Item3D({
       position={[it.x * M, it.elevation * M, it.y * M]}
       rotation-y={(-it.rotation * Math.PI) / 180}
       onClick={onClick}
+      onDoubleClick={(e) => {
+        if (!interactive || !unfolds) return;
+        e.stopPropagation();
+        s().toggleExpanded(it.id);
+      }}
       onPointerOver={(e) => {
         if (!interactive) return;
         e.stopPropagation();
@@ -328,7 +421,12 @@ const Item3D = memo(function Item3D({
         <PartMesh key={i} p={p} />
       ))}
       {outline && (
-        <mesh position={[0, (it.height / 2) * M, 0]} scale={[(it.width + 30) * M, (it.height + 30) * M, (it.depth + 30) * M]} userData={{ helper: true }} raycast={() => null}>
+        <mesh
+          position={[0, (it.height / 2) * M, ((back + front) / 2) * M]}
+          scale={[(it.width + 30) * M, (it.height + 30) * M, (front - back + 30) * M]}
+          userData={{ helper: true }}
+          raycast={() => null}
+        >
           <boxGeometry />
           <meshBasicMaterial visible={false} />
           <Edges color={outline} />
