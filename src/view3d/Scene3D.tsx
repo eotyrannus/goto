@@ -8,9 +8,10 @@ import { DND_MIME } from '../canvas/PlanCanvas';
 import { CATALOG_BY_TYPE } from '../model/catalog';
 import { findIssues } from '../model/clashes';
 import { furnitureParts, type Part } from '../model/furniture3d';
-import { depthExtent, itemBounds, openingFrame, frameToWorld } from '../model/geometry';
+import { depthExtent, openingFrame, frameToWorld } from '../model/geometry';
 import type { Design, DoorMaterial, FurnitureItem, Opening, OpeningKind, Room, Wall } from '../model/types';
 import { DOOR_OPEN, doorLeafSegments, wallBlocks, type Block } from '../model/walls3d';
+import { isBlocked, walkWorld } from '../model/walkable';
 import { FLOOR_RAISE, mod10Parts } from '../model/exterior';
 import { useDesign } from '../store/designStore';
 import { scene3dApi } from './api';
@@ -564,23 +565,14 @@ function WalkRig({ design }: { design: Design }) {
   const { room } = design;
   const eye = Math.min(1600, room.height - 150) * M;
 
-  // Blockers: furniture you can't walk through (rugs and high wall-mounted things don't count).
-  const blockers = useMemo(
-    () =>
-      design.items
-        .filter((it) => CATALOG_BY_TYPE[it.type]?.layer !== 'floor' && it.elevation < 1700)
-        .map((it) => {
-          const b = itemBounds(it);
-          const pad = 180;
-          return { x0: (b.minX - pad) * M, x1: (b.maxX + pad) * M, z0: (b.minY - pad) * M, z1: (b.maxY + pad) * M };
-        }),
-    [design.items],
+  // Walls (except doorways), shut doors and furniture block you; the ground steps from the
+  // floor to the deck to the lawn. Positions here are metres; the walk world works in mm.
+  const shut = useDoors((s) => s.shut);
+  const world = useMemo(
+    () => walkWorld(design, new Set(Object.keys(shut).filter((id) => shut[id]))),
+    [design, shut],
   );
-  const blocked = (x: number, z: number) => {
-    const m = 0.25;
-    if (x < m || z < m || x > room.width * M - m || z > room.depth * M - m) return true;
-    return blockers.some((b) => x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1);
-  };
+  const blocked = (x: number, z: number) => isBlocked(world, { x: x / M, y: z / M });
 
   useEffect(() => {
     const cam = camera as THREE.PerspectiveCamera;
@@ -598,7 +590,7 @@ function WalkRig({ design }: { design: Design }) {
       start = { x: p.x, z: p.y, yaw: Math.atan2(-inward.x, -inward.y) };
     }
     if (blocked(start.x * M, start.z * M)) start = { x: room.width / 2, z: room.depth / 2, yaw: start.yaw };
-    camera.position.set(start.x * M, eye, start.z * M);
+    camera.position.set(start.x * M, eye + world.ground({ x: start.x, y: start.z }) * M, start.z * M);
     look.current = { yaw: start.yaw, pitch: -0.08 };
 
     const el = gl.domElement;
@@ -651,7 +643,10 @@ function WalkRig({ design }: { design: Design }) {
       if (!blocked(p.x + dx, p.z)) p.x += dx;
       if (!blocked(p.x, p.z + dz)) p.z += dz;
     }
-    camera.position.y = eye;
+    // Ease up and down steps rather than snapping.
+    const p = camera.position;
+    const target = eye + world.ground({ x: p.x / M, y: p.z / M }) * M;
+    p.y += (target - p.y) * Math.min(1, dt * 10);
     camera.rotation.set(pitch, yaw, 0, 'YXZ');
   });
   return null;

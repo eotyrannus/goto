@@ -248,3 +248,41 @@ test('Melwood Mod 10 exterior: choose it, match its size, and switch inside/outs
   await expect(page.getByTestId('toggle-inside')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+test('walk mode: out through the door, down onto the deck and the lawn, blocked by a shut door', async ({ page }) => {
+  await open3d(page, 'Focus pod');
+  await page.getByTestId('view-2d').click();
+  await page.getByTestId('exterior-style').selectOption('mod10');
+  await page.getByTestId('view-3d').click();
+  await page.waitForFunction(() => (window as any).__pod.three?.ready);
+  await page.getByTestId('walk-button').click();
+  await page.waitForTimeout(400);
+  const cam = () => page.evaluate(() => (window as any).__pod.three.camera());
+  const d = await design(page);
+  const start = await cam();
+  expect(start.y).toBeLessThan(d.room.depth); // starts inside, by the door
+  expect(Math.round(start.z)).toBe(1600);
+
+  // Walk backwards out of the door (on the bottom wall), across the deck onto the lawn.
+  // Software rendering is slow, so keep walking until we get there rather than for a fixed time.
+  const past = d.room.depth + 1700;
+  await page.keyboard.down('KeyS');
+  await page.waitForFunction((y) => (window as any).__pod.three.camera().y > y, past, { timeout: 20_000 });
+  await page.keyboard.up('KeyS');
+  await page.waitForTimeout(800);
+  const out = await cam();
+  expect(out.y).toBeGreaterThan(past); // past the deck
+  expect(Math.round(out.z)).toBe(1600 - 300); // eye height above the lawn, 30 cm lower
+
+  // Shut the door from outside, then try to walk back in.
+  const door = d.openings.find((o: any) => o.kind === 'door');
+  await page.evaluate((id) => (window as any).__pod.three.project(id), door.id).then((p: any) => page.mouse.click(p.x, p.y));
+  expect(await page.evaluate((id) => (window as any).__pod.three.doorShut(id), door.id)).toBe(true);
+  const before = await cam();
+  await page.keyboard.down('KeyW');
+  await page.waitForTimeout(3000);
+  await page.keyboard.up('KeyW');
+  const after = await cam();
+  expect(after.y).toBeGreaterThan(d.room.depth); // still outside: the shut door stopped us
+  expect(after.y).toBeLessThan(before.y);
+});

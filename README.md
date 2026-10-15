@@ -35,7 +35,7 @@ Designs are saved in the browser *for this exact address*, so always open http:/
   - Click a door to open or close it (sliding doors slide). This works in walk mode too. Door state is a viewing aid and isn't saved with the design.
   - Doors have a material: wood, glass, wood with a glass centre, or aluminium with a glass centre (side panel → Material). Glass doors show a blue leaf on the plan.
   - Sofa beds unfold to their *Expanded length*: use the button in the side panel, double-click on the plan or in 3D, or click while walking. The unfolded state is saved, and clash warnings and wall distances use the open bed's footprint.
-  - *Walk* puts you inside at eye height: drag to look, W A S D or the arrow keys to move, Shift to go faster, Esc to stop. Walls and furniture block you.
+  - *Walk* puts you inside at eye height: drag to look, W A S D or the arrow keys to move, Shift to go faster, Esc to stop. Walk out through any open doorway and around the outside (up to 5 m from the building). Walls, window sills, shut doors and furniture block you, and you step down onto the deck and lawn when there's an exterior.
 - **Export:** PNG or JPEG of the plan with a title block and scale bar. From the 3D view: a PNG of the current view, or a `.glb` 3D model for other 3D apps. Also `.pod.json` design files for backup or sharing (Export → Import design file).
 
 ### Shortcuts
