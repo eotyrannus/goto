@@ -21,6 +21,10 @@ Designs are saved in the browser *for this exact address*, so always open http:/
 - **Furniture:** 25 plan symbols across six groups (work, meeting, lounge, storage, fixtures, decor). Drag one from the catalog or click to drop it in the middle of the room.
   - Moving snaps to walls, other items' edges and centres, and the grid. Hold Alt to place freely.
   - Resize and rotate with the handles (rotation snaps to 45°), or type exact values. Each item type has its own size limits.
+- **Exterior:** Room panel → Exterior → *Melwood Mod 10* wraps the room in that building, modelled from the Melwood 2026 catalogue: skillion roof (high at the front), highlight windows across the top of the front, board-and-batten cladding, Colorbond® roof in the four stock colours, gutter and downpipe, raised pier floor and a full-width 1.3 m deck.
+  - It follows your room's size. *Match Mod 10 size* sets the room to the catalogue footprint (3.6 × 2.6 m outside) with the upgraded 2.4 m ceiling, which this app assumes for a habitable room. The catalogue drawings show the standard ceiling (2.8 m overall), so this model is a little taller.
+  - Choose which wall is the front (the deck side); it defaults to the wall with your door. Your doors and windows cut through the cladding with white trims.
+  - In 3D, *Outside view* shows the whole building; *Inside view* lifts the roof and cuts the near walls. The plan shows the deck and the roof overhang.
 - **Colours:** every item, door and window has a colour, and the room has wall and floor colours. Use the picker or swatches in the side panel, or *Reset to default colour*. Selecting several items recolours them together. Colours show fully in 3D and as soft tints on the plan (View → Colours on plan).
 - **Planning aids:** distances from the selected item to each wall, and red highlights for items that overlap, stick out of the room, block a door swing or are taller than the ceiling.
 - **Editing:** multi-select (Shift-click or drag a box), duplicate, copy/paste, lock, front/back ordering, and undo/redo for every change.

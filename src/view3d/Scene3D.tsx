@@ -11,6 +11,7 @@ import { furnitureParts, type Part } from '../model/furniture3d';
 import { depthExtent, itemBounds, openingFrame, frameToWorld } from '../model/geometry';
 import type { Design, DoorMaterial, FurnitureItem, Opening, OpeningKind, Room, Wall } from '../model/types';
 import { DOOR_OPEN, doorLeafSegments, wallBlocks, type Block } from '../model/walls3d';
+import { FLOOR_RAISE, mod10Parts } from '../model/exterior';
 import { useDesign } from '../store/designStore';
 import { scene3dApi } from './api';
 import { useDoors } from './doors';
@@ -93,7 +94,24 @@ const STUB = 120;
  * Dollhouse cutaway: any wall the orbit camera is behind drops to a low stub so you can see in.
  * Each wall has a full-height group and a stub group; exactly one of them is visible.
  */
-function Cutaway({ room, groups, mode }: { room: Room; groups: RefObject<Record<string, THREE.Group | null>>; mode: Mode }) {
+/**
+ * With an exterior shell, the outside view keeps everything standing (roof included); the inside
+ * view lifts the roof and cuts the near walls and their cladding. Without a shell, near walls are
+ * always cut in orbit mode.
+ */
+function Cutaway({
+  room,
+  groups,
+  mode,
+  shell,
+  inside,
+}: {
+  room: Room;
+  groups: RefObject<Record<string, THREE.Group | null>>;
+  mode: Mode;
+  shell: boolean;
+  inside: boolean;
+}) {
   useFrame(({ camera }) => {
     const p = camera.position;
     const behind: Record<Wall, boolean> = {
@@ -103,21 +121,26 @@ function Cutaway({ room, groups, mode }: { room: Room; groups: RefObject<Record<
       right: p.x > room.width * M,
     };
     for (const w of WALLS) {
-      const cut = mode === 'orbit' && behind[w];
+      const cut = mode === 'orbit' && behind[w] && (!shell || inside);
       const full = groups.current?.[`full-${w}`];
       const stub = groups.current?.[`stub-${w}`];
+      const clad = groups.current?.[`ext-${w}`];
       if (full) full.visible = !cut;
       if (stub) stub.visible = cut;
+      if (clad) clad.visible = !cut;
     }
+    const roof = groups.current?.['ext-roof'];
+    if (roof) roof.visible = !(mode === 'orbit' && inside);
   });
   return null;
 }
 
-function Room3D({ design, mode }: { design: Design; mode: Mode }) {
+function Room3D({ design, mode, inside }: { design: Design; mode: Mode; inside: boolean }) {
   const { room, openings } = design;
   const blocks = useMemo(() => wallBlocks(room, openings), [room, openings]);
   const groups = useRef<Record<string, THREE.Group | null>>({});
   const wallMats = useWallMaterials(room.wallColor);
+  const shell = design.exterior.style !== 'none';
   const W = room.width * M;
   const D = room.depth * M;
   const H = room.height * M;
@@ -125,9 +148,10 @@ function Room3D({ design, mode }: { design: Design; mode: Mode }) {
   // Openings on a cut-away wall are hidden along with it (door leaves stay: they're in the room).
   return (
     <group>
-      <Cutaway room={room} groups={groups} mode={mode} />
+      <Cutaway room={room} groups={groups} mode={mode} shell={shell} inside={inside} />
+      {shell && <Exterior3D design={design} groups={groups} />}
       {/* Ground around the room, the floor, and a ceiling that's only visible from below. */}
-      <mesh rotation-x={-Math.PI / 2} position={[W / 2, -0.002, D / 2]} receiveShadow>
+      <mesh rotation-x={-Math.PI / 2} position={[W / 2, shell ? -FLOOR_RAISE * M : -0.002, D / 2]} receiveShadow>
         <planeGeometry args={[W + 30, D + 30]} />
         <meshStandardMaterial color="#e2e5e9" roughness={1} />
       </mesh>
@@ -337,11 +361,55 @@ function DoorPanel({ len, height, thick, kind, color, sliding = false }: { len: 
   );
 }
 
+// ---------- exterior shell ----------
+
+/** Wedges (boxes with a sloping top) are built at real size, like rounded boxes. */
+const wedges = new Map<string, THREE.BufferGeometry>();
+function wedge(sx: number, sy: number, back: number, front: number) {
+  const key = [sx, sy, back, front].map((v) => v.toFixed(4)).join('|');
+  if (!wedges.has(key)) {
+    const g = new THREE.BoxGeometry(sx, 1, sy);
+    const pos = g.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      // Bottom at 0; top at `back` on the -Z (plan -y) end and `front` on the +Z end.
+      pos.setY(i, pos.getY(i) > 0 ? (pos.getZ(i) < 0 ? back : front) : 0);
+    }
+    g.computeVertexNormals();
+    wedges.set(key, g);
+  }
+  return wedges.get(key)!;
+}
+
+function Exterior3D({ design, groups }: { design: Design; groups: RefObject<Record<string, THREE.Group | null>> }) {
+  const { room, openings, exterior } = design;
+  const { parts, frame } = useMemo(() => mod10Parts(room, openings, exterior), [room, openings, exterior]);
+  const bySide = useMemo(() => {
+    const out = new Map<string, Part[]>();
+    for (const p of parts) out.set(p.side, [...(out.get(p.side) ?? []), p]);
+    return out;
+  }, [parts]);
+  return (
+    <group position={[frame.x * M, 0, frame.y * M]} rotation-y={(-frame.rotation * Math.PI) / 180} name="exterior">
+      {[...bySide.entries()].map(([side, list]) => (
+        <group key={side} ref={(g) => void (groups.current[`ext-${side}`] = g)} userData={{ wallFull: side !== 'base' }}>
+          {list.map((p, i) => (
+            <PartMesh key={i} p={p} />
+          ))}
+        </group>
+      ))}
+    </group>
+  );
+}
+
 // ---------- furniture ----------
 
 function PartMesh({ p }: { p: Part }) {
-  const common = { material: material(p.color, p.glow), castShadow: true, receiveShadow: true };
+  const common = { material: p.glass ? GLASS : material(p.color, p.glow), castShadow: !p.glass, receiveShadow: true };
   const position: [number, number, number] = [p.x * M, p.z * M, p.y * M];
+  const tilt = -THREE.MathUtils.degToRad(p.tilt ?? 0);
+  if (p.shape === 'wedge') {
+    return <mesh {...common} geometry={wedge(p.sx * M, p.sy * M, p.sz * M, (p.topFront ?? p.sz) * M)} position={position} />;
+  }
   if (p.shape === 'rbox') {
     // Built at real size; tilt leans the top towards the back (-y on the plan, -Z here).
     return <mesh {...common} geometry={roundedBox(p.sx * M, p.sz * M, p.sy * M, (p.radius ?? 20) * M)} position={position} rotation-x={-THREE.MathUtils.degToRad(p.tilt ?? 0)} />;
@@ -355,7 +423,13 @@ function PartMesh({ p }: { p: Part }) {
     );
   }
   return (
-    <mesh {...common} geometry={p.shape === 'box' ? BOX : p.shape === 'sphere' ? SPHERE : cylinder(p.taper)} position={position} scale={[p.sx * M, p.sz * M, p.sy * M]} />
+    <mesh
+      {...common}
+      geometry={p.shape === 'box' ? BOX : p.shape === 'sphere' ? SPHERE : cylinder(p.taper)}
+      position={position}
+      rotation-x={tilt}
+      scale={[p.sx * M, p.sz * M, p.sy * M]}
+    />
   );
 }
 
@@ -596,7 +670,7 @@ function ApiBridge() {
 
 // ---------- scene ----------
 
-function Contents({ mode }: { mode: Mode }) {
+function Contents({ mode, inside }: { mode: Mode; inside: boolean }) {
   const design = useDesign((s) => s.design);
   const selection = useDesign((s) => s.selection);
   const settings = useDesign((s) => s.settings);
@@ -632,7 +706,7 @@ function Contents({ mode }: { mode: Mode }) {
       >
         <object3D attach="target" position={[W / 2, 0, D / 2]} />
       </directionalLight>
-      <Room3D design={design} mode={mode} />
+      <Room3D design={design} mode={mode} inside={inside} />
       {design.items.map((it) => (
         <Item3D
           key={it.id}
@@ -651,6 +725,8 @@ function Contents({ mode }: { mode: Mode }) {
 
 export default function Scene3D() {
   const [mode, setMode] = useState<Mode>('orbit');
+  const [inside, setInside] = useState(false);
+  const shell = useDesign((s) => s.design.exterior.style !== 'none');
   const downAt = useRef<{ x: number; y: number } | null>(null);
 
   // While walking, the plan's keyboard shortcuts (arrows nudge, R rotates…) stand down.
@@ -699,11 +775,16 @@ export default function Scene3D() {
           if (mode === 'orbit' && d && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 5) useDesign.getState().setSelection(null);
         }}
       >
-        <Contents mode={mode} />
+        <Contents mode={mode} inside={inside} />
       </Canvas>
       <div className="scene3d-controls">
         {mode === 'orbit' ? (
           <>
+            {shell && (
+              <button className={inside ? 'active' : ''} onClick={() => setInside(!inside)} data-testid="toggle-inside" title="Lift the roof and cut the near walls to see your layout">
+                {inside ? 'Outside view' : 'Inside view'}
+              </button>
+            )}
             <button onClick={() => scene3dApi.view('fit')} title="Three-quarter view of the whole room">Fit</button>
             <button onClick={() => scene3dApi.view('top')} title="Look straight down">Top</button>
             <button onClick={() => setMode('walk')} data-testid="walk-button" title="Walk around inside at eye height">Walk</button>

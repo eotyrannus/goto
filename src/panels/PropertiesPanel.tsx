@@ -5,6 +5,7 @@ import { wallLength } from '../model/geometry';
 import type { DoorMaterial, FurnitureItem, Opening, Wall } from '../model/types';
 import { cmToMm, formatArea, mmToCm } from '../model/units';
 import { ROOM_COLORS } from '../model/color';
+import { DEFAULT_EXTERIOR, EXTERIOR_STYLES, MOD10, mod10RoomSize, ROOF_COLOURS, type Exterior } from '../model/exterior';
 import { useDesign } from '../store/designStore';
 
 /** Numeric field that edits a millimetre value in centimetres; commits on Enter or blur. */
@@ -157,6 +158,81 @@ function AngleField({ deg, onChange }: { deg: number; onChange: (deg: number) =>
   );
 }
 
+const WALL_NAMES: Record<Wall, string> = { top: 'Top', right: 'Right', bottom: 'Bottom', left: 'Left' };
+
+function ExteriorProps() {
+  const design = useDesign((s) => s.design);
+  const updateExterior = useDesign((s) => s.updateExterior);
+  const updateRoom = useDesign((s) => s.updateRoom);
+  const { exterior: ext, room } = design;
+  const outside = { w: room.width + 2 * room.wallThickness, d: room.depth + 2 * room.wallThickness };
+  const along = ext.front === 'top' || ext.front === 'bottom' ? outside.w : outside.d;
+  const deep = ext.front === 'top' || ext.front === 'bottom' ? outside.d : outside.w;
+  const target = mod10RoomSize(room, ext.front);
+  const matches = target.width === room.width && target.depth === room.depth && target.height === room.height;
+  return (
+    <>
+      <h3>Exterior</h3>
+      <label className="field">
+        <span>Design</span>
+        <select
+          data-testid="exterior-style"
+          value={ext.style}
+          onChange={(e) => {
+            const style = e.target.value as Exterior['style'];
+            // Face the front (deck, tall side, highlights) towards the first door, if there is one.
+            const door = design.openings.find((o) => isDoor(o.kind));
+            updateExterior({ style, ...(style !== 'none' && ext.style === 'none' && door ? { front: door.wall } : {}) });
+          }}
+        >
+          {EXTERIOR_STYLES.map((x) => (
+            <option key={x.id} value={x.id}>{x.name}</option>
+          ))}
+        </select>
+      </label>
+      {ext.style === 'mod10' && (
+        <>
+          <label className="field">
+            <span>Front (deck side)</span>
+            <select data-testid="exterior-front" value={ext.front} onChange={(e) => updateExterior({ front: e.target.value as Wall })}>
+              {(['top', 'right', 'bottom', 'left'] as Wall[]).map((w) => (
+                <option key={w} value={w}>{WALL_NAMES[w]} wall</option>
+              ))}
+            </select>
+          </label>
+          <p className="hint">
+            Mod 10 with the upgraded ceiling: {mmToCm(MOD10.width)} × {mmToCm(MOD10.depth)} cm outside, {mmToCm(MOD10.ceiling)} cm ceiling, plus
+            a {mmToCm(MOD10.deck)} cm deck. Yours: {mmToCm(along)} × {mmToCm(deep)} cm outside, {mmToCm(room.height)} cm ceiling.{' '}
+            {!matches && (
+              <button className="link" data-testid="match-mod10" onClick={() => updateRoom(target)}>
+                Match Mod 10 size
+              </button>
+            )}
+          </p>
+          <ColorField
+            label="Cladding colour"
+            value={ext.claddingColor}
+            defaultColor={DEFAULT_EXTERIOR.claddingColor}
+            onChange={(claddingColor, live) => updateExterior({ claddingColor }, live)}
+            testId="cladding-color"
+          />
+          <div className="field">
+            <span>Colorbond® roof</span>
+            <div className="btn-row wrap roof-colours">
+              {ROOF_COLOURS.map((r) => (
+                <button key={r.name} className={r.color === ext.roofColor ? 'active' : ''} onClick={() => updateExterior({ roofColor: r.color })}>
+                  <i style={{ background: r.color }} />
+                  {r.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
 function RoomProps() {
   const design = useDesign((s) => s.design);
   const updateRoom = useDesign((s) => s.updateRoom);
@@ -182,6 +258,7 @@ function RoomProps() {
       <p className="hint">
         Drag the blue handles on the right and bottom walls to resize. Drag furniture, doors and windows in from the left.
       </p>
+      <ExteriorProps />
       <h3>Shortcuts</h3>
       <dl className="shortcuts">
         <dt>Del</dt><dd>Delete selection</dd>

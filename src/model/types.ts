@@ -1,3 +1,5 @@
+import type { Exterior } from './exterior';
+
 // All lengths are millimetres. Rotation is degrees, clockwise (Konva convention).
 
 export type Wall = 'top' | 'right' | 'bottom' | 'left';
@@ -63,6 +65,8 @@ export interface Design {
   room: Room;
   openings: Opening[];
   items: FurnitureItem[];
+  /** Building shell drawn around the room. */
+  exterior: Exterior;
 }
 
 export interface Settings {

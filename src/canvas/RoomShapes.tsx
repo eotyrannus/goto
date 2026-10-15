@@ -1,5 +1,6 @@
 import { Group, Line, Rect, Text } from 'react-konva';
-import { doorLeaves } from '../model/geometry';
+import { doorLeaves, type Pt } from '../model/geometry';
+import { mod10Outline, type Exterior } from '../model/exterior';
 import type { Opening, Room, Wall } from '../model/types';
 import { formatLength } from '../model/units';
 import { INK } from './symbols/Symbols';
@@ -143,4 +144,44 @@ export function Grid({ room, grid, scale, show, floor = '#ffffff' }: { room: Roo
       {lines}
     </>
   );
+}
+
+/** Plan view of an exterior shell: the deck with its boards, and the roof overhang as a dashed line. */
+export function ExteriorOutline({ room, exterior, tint }: { room: Room; exterior: Exterior; tint: boolean }) {
+  if (exterior.style === 'none') return null;
+  const { deck, roof, boards } = mod10Outline(room, exterior);
+  const flat = (pts: Pt[]) => pts.flatMap((p) => [p.x, p.y]);
+  return (
+    <Group listening={false}>
+      <Line points={flat(deck)} closed fill={tint ? '#ecdcc0' : '#ffffff'} {...thin} />
+      {boards.map(([a, b], i) => (
+        <Line key={i} points={[a.x, a.y, b.x, b.y]} stroke="#b9a27f" strokeWidth={0.5} strokeScaleEnabled={false} />
+      ))}
+      <Line points={flat(roof)} closed dash={[10, 6]} {...thin} />
+    </Group>
+  );
+}
+
+/**
+ * Everything drawn on the plan, in plan millimetres: the room and its walls, the dimension lines
+ * (above and left), and an exterior's deck and roof outline. Used to frame the view and exports.
+ */
+export function planBounds(room: Room, exterior: Exterior, pad = 0) {
+  const fs = annotationSize(room);
+  const t = room.wallThickness;
+  const dims = t + fs * 3.2;
+  let minX = -dims;
+  let minY = -dims;
+  let maxX = room.width + t;
+  let maxY = room.depth + t;
+  if (exterior.style !== 'none') {
+    const { deck, roof } = mod10Outline(room, exterior);
+    for (const p of [...deck, ...roof]) {
+      minX = Math.min(minX, p.x);
+      minY = Math.min(minY, p.y);
+      maxX = Math.max(maxX, p.x);
+      maxY = Math.max(maxY, p.y);
+    }
+  }
+  return { minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad };
 }

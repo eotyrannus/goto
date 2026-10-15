@@ -1,6 +1,7 @@
 import type { Design, FurnitureItem, Opening } from './types';
 import { CATALOG_BY_TYPE, isDoor, OPENING_BY_KIND } from './catalog';
 import { ROOM_COLORS } from './color';
+import { DEFAULT_EXTERIOR } from './exterior';
 import { DEFAULT_ROOM_HEIGHT } from './normalize';
 import { uid } from './units';
 
@@ -25,6 +26,7 @@ export function newDesign(name: string, width = 3000, depth = 2500, parts: Parti
     room: { width, depth, height: DEFAULT_ROOM_HEIGHT, wallThickness: 100, wallColor: ROOM_COLORS.wall, floorColor: ROOM_COLORS.floor },
     openings: [],
     items: [],
+    exterior: DEFAULT_EXTERIOR,
     ...parts,
   };
 }

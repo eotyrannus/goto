@@ -212,3 +212,39 @@ test('sofa bed unfolds by button and double-click, and its footprint grows', asy
   expect((await design(page)).items[0].expanded).toBe(true);
   await expect(page.getByTestId('properties')).toContainText('Sticks out of the room');
 });
+
+test('Melwood Mod 10 exterior: choose it, match its size, and switch inside/outside views', async ({ page }) => {
+  const errors = await open3d(page, 'Focus pod');
+  await page.getByTestId('view-2d').click();
+  await page.getByTestId('exterior-style').selectOption('mod10');
+  let d = await design(page);
+  // The front faces the existing door (on the bottom wall) and nothing else changes yet.
+  expect(d.exterior).toMatchObject({ style: 'mod10', front: 'bottom' });
+  expect(d.room).toMatchObject({ width: 2400, depth: 2000, height: 2500 });
+
+  await page.getByTestId('match-mod10').click();
+  d = await design(page);
+  expect(d.room).toMatchObject({ width: 3364, depth: 2364, height: 2400 });
+  await expect(page.getByTestId('match-mod10')).toHaveCount(0);
+
+  await page.getByTestId('exterior-front').selectOption('left');
+  await page.getByText('Surfmist').click();
+  d = await design(page);
+  expect(d.exterior).toMatchObject({ front: 'left', roofColor: '#e4e2d5' });
+
+  await page.getByTestId('view-3d').click();
+  await page.waitForFunction(() => (window as any).__pod.three?.ready);
+  await expect(page.getByTestId('toggle-inside')).toHaveText('Inside view');
+  await page.getByTestId('toggle-inside').click();
+  await expect(page.getByTestId('toggle-inside')).toHaveText('Outside view');
+
+  // The 3D model export includes the shell.
+  await page.getByTestId('export-menu').click();
+  const [glb] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-glb').click()]);
+  await glb.saveAs('test-results/mod10.glb');
+
+  // Back to none: no toggle.
+  await page.getByTestId('exterior-style').selectOption('none');
+  await expect(page.getByTestId('toggle-inside')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});

@@ -1,5 +1,5 @@
 import Konva from 'konva';
-import { annotationSize, FONT } from '../canvas/RoomShapes';
+import { annotationSize, FONT, planBounds } from '../canvas/RoomShapes';
 import type { Design } from '../model/types';
 import { formatArea, formatLength } from '../model/units';
 
@@ -19,10 +19,9 @@ interface RenderOptions {
  */
 export function renderPlan(stage: Konva.Stage, design: Design, opts: RenderOptions): string {
   const { room } = design;
-  const fs = annotationSize(room);
-  const margin = room.wallThickness + fs * 4.5;
-  const worldW = room.width + 2 * margin;
-  const worldH = room.depth + 2 * margin;
+  const b = planBounds(room, design.exterior, annotationSize(room) * 1.5);
+  const worldW = b.maxX - b.minX;
+  const worldH = b.maxY - b.minY;
   const s = opts.width / worldW;
   const titleH = opts.titleBlock ? 96 : 0;
   const width = Math.round(worldW * s);
@@ -38,7 +37,7 @@ export function renderPlan(stage: Konva.Stage, design: Design, opts: RenderOptio
     for (const name of ['grid', 'content']) {
       const layer = stage.findOne(`.${name}`) as Konva.Layer | undefined;
       if (!layer) continue;
-      const copy = layer.clone({ x: margin * s, y: margin * s, scaleX: s, scaleY: s, listening: false }) as Konva.Layer;
+      const copy = layer.clone({ x: -b.minX * s, y: -b.minY * s, scaleX: s, scaleY: s, listening: false }) as Konva.Layer;
       out.add(copy);
     }
 

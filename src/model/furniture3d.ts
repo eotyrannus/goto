@@ -6,8 +6,12 @@ import { shade } from './color';
 // floor (or on its mounting height for wall-mounted items).
 
 export interface Part {
-  /** rbox: a box with rounded edges (radius), for upholstery. */
-  shape: 'box' | 'rbox' | 'cyl' | 'sphere';
+  /**
+   * rbox: a box with rounded edges (radius), for upholstery.
+   * wedge: a box whose top slopes along y — `sz` high at the -y end, `topFront` at the +y end;
+   * for wedges `z` is the bottom, not the centre.
+   */
+  shape: 'box' | 'rbox' | 'cyl' | 'sphere' | 'wedge';
   /** Centre. */
   x: number;
   y: number;
@@ -27,6 +31,10 @@ export interface Part {
   tilt?: number;
   /** Cylinders only: lay the cylinder along the x or y axis instead of standing it up. */
   axis?: 'x' | 'y';
+  /** Wedges only: height at the +y end. */
+  topFront?: number;
+  /** Draw with the glass material. */
+  glass?: boolean;
 }
 
 export const COLORS = {

@@ -180,3 +180,8 @@ input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color:
 .swatches button.on { outline: 2px solid var(--accent); outline-offset: 1px; }
 .reset-color { align-self: flex-start; font-size: 11px; }
 .grid2 .swatches { grid-template-columns: repeat(4, 1fr); }
+
+/* ---- exterior ---- */
+.roof-colours { margin-top: 0 !important; }
+.roof-colours button { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 4px 8px; }
+.roof-colours i { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.2); display: inline-block; }

@@ -20,7 +20,7 @@ import {
 import type { FurnitureItem, Opening, OpeningKind, Room } from '../model/types';
 import { formatLength } from '../model/units';
 import { useDesign } from '../store/designStore';
-import { FONT, Grid, OpeningSymbol, RoomDimensions, Walls, annotationSize } from './RoomShapes';
+import { ExteriorOutline, FONT, Grid, OpeningSymbol, RoomDimensions, Walls, annotationSize, planBounds } from './RoomShapes';
 import { FurnitureSymbol, INK, planTint } from './symbols/Symbols';
 
 export const DND_MIME = 'application/x-podplanner';
@@ -85,11 +85,12 @@ export function PlanCanvas() {
 
   const fit = useCallback(() => {
     if (!size.w || !size.h) return;
-    const r = useDesign.getState().design.room;
-    const margin = r.wallThickness + annotationSize(r) * 3.5;
-    const scale = Math.min(size.w / (r.width + 2 * margin), size.h / (r.depth + 2 * margin)) * 0.92;
+    const { room: r, exterior } = useDesign.getState().design;
+    // Generous padding leaves space to drag the walls outwards.
+    const b = planBounds(r, exterior, annotationSize(r) * 5);
+    const scale = Math.min(size.w / (b.maxX - b.minX), size.h / (b.maxY - b.minY)) * 0.92;
     fitScale.current = scale;
-    setView({ scale, x: (size.w - r.width * scale) / 2 + margin * scale * 0.25, y: (size.h - r.depth * scale) / 2 + margin * scale * 0.25 });
+    setView({ scale, x: size.w / 2 - ((b.minX + b.maxX) / 2) * scale, y: size.h / 2 - ((b.minY + b.maxY) / 2) * scale });
   }, [size.w, size.h]);
 
   const zoomAt = useCallback((factor: number, at?: Pt) => {
@@ -107,6 +108,16 @@ export function PlanCanvas() {
       fit();
     }
   }, [design.id, size.w, fit]);
+
+  // Re-frame when an exterior shell (and its deck) appears or goes away.
+  const shellKey = `${design.exterior.style}:${design.exterior.front}`;
+  const lastShell = useRef(shellKey);
+  useEffect(() => {
+    if (lastShell.current !== shellKey) {
+      lastShell.current = shellKey;
+      fit();
+    }
+  }, [shellKey, fit]);
 
   useEffect(() => {
     canvasApi.stage = stageRef.current;
@@ -463,6 +474,7 @@ export function PlanCanvas() {
           </Layer>
 
           <Layer name="content">
+            <ExteriorOutline room={room} exterior={design.exterior} tint={settings.colorPlan} />
             <Walls room={room} openings={design.openings} />
             {/* Rugs go under door leaves and swing arcs; everything else sits on top. */}
             {ordered.filter(isFloor).map(renderItem)}

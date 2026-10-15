@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_EXTERIOR } from './exterior';
 import { normalizeDesign } from './normalize';
 import type { Design } from './types';
 
@@ -17,6 +18,7 @@ describe('normalizeDesign', () => {
     expect(d.items[0].height).toBe(1800);
     expect(d.items[0].elevation).toBe(0);
     expect(d.openings[0]).toMatchObject({ height: 1200, sill: 900 });
+    expect(d.exterior.style).toBe('none');
   });
 
   it('keeps heights that are already set', () => {
@@ -27,7 +29,9 @@ describe('normalizeDesign', () => {
       room: { width: 3000, depth: 2000, height: 3100, wallThickness: 100, wallColor: '#ffffff', floorColor: '#ffffff' },
       items: [{ id: 'a', type: 'desk', x: 0, y: 0, width: 1, depth: 1, height: 1050, elevation: 0, color: '#ffffff', rotation: 0 }],
       openings: [],
+      exterior: { ...DEFAULT_EXTERIOR, style: 'mod10', front: 'left' },
     });
+    expect(d.exterior).toMatchObject({ style: 'mod10', front: 'left' });
     expect(d.room.height).toBe(3100);
     expect(d.items[0].height).toBe(1050);
   });

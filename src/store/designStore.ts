@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { CATALOG_BY_TYPE, isDoor, OPENING_BY_KIND } from '../model/catalog';
 import { clampOpening, itemBounds, nearestWall, wallLength, type Pt } from '../model/geometry';
 import type { Design, FurnitureItem, Opening, OpeningKind, Room, Selection, Settings } from '../model/types';
+import type { Exterior } from '../model/exterior';
 import { uid } from '../model/units';
 import { templates } from '../model/templates';
 import { normalizeDesign } from '../model/normalize';
@@ -33,6 +34,7 @@ interface State {
 
   rename: (name: string) => void;
   updateRoom: (patch: Partial<Room>, live?: boolean) => void;
+  updateExterior: (patch: Partial<Exterior>, live?: boolean) => void;
   addItem: (type: string, at?: Pt) => void;
   updateItems: (patches: Record<string, Partial<FurnitureItem>>, live?: boolean) => void;
   addOpening: (kind: OpeningKind, at?: Pt) => void;
@@ -113,6 +115,13 @@ export const useDesign = create<State>((set, get) => {
       room.height = Math.min(Math.max(Math.round(room.height), 1800), 6000);
       room.wallThickness = Math.min(Math.max(Math.round(room.wallThickness), 20), 500);
       const next = { ...d, room, openings: fitOpenings(room, d.openings) };
+      if (live) get().updateLive(next);
+      else commit(next);
+    },
+
+    updateExterior: (patch, live = false) => {
+      const d = get().design;
+      const next = { ...d, exterior: { ...d.exterior, ...patch } };
       if (live) get().updateLive(next);
       else commit(next);
     },

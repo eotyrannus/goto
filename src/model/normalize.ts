@@ -1,5 +1,6 @@
 import { CATALOG_BY_TYPE, isDoor, OPENING_BY_KIND } from './catalog';
 import { ROOM_COLORS } from './color';
+import { DEFAULT_EXTERIOR } from './exterior';
 import type { Design } from './types';
 
 export const DEFAULT_ROOM_HEIGHT = 2500;
@@ -8,6 +9,7 @@ export const DEFAULT_ROOM_HEIGHT = 2500;
 export function normalizeDesign(d: Design): Design {
   return {
     ...d,
+    exterior: { ...DEFAULT_EXTERIOR, ...d.exterior },
     room: {
       ...d.room,
       height: d.room.height ?? DEFAULT_ROOM_HEIGHT,
