@@ -2,6 +2,7 @@ import { shade } from './color';
 import type { Pt } from './geometry';
 import type { Part } from './furniture3d';
 import type { Opening, Room, Wall } from './types';
+import type { WallProfile } from './walls3d';
 
 // Exterior shells drawn around the room in 3D (and as outlines on the plan).
 //
@@ -11,8 +12,9 @@ import type { Opening, Room, Wall } from './types';
 // downpipe, an elevated pier floor and a full-width 1.3 m pine deck in front.
 //
 // The catalogue offers a standard and an upgraded (taller) ceiling; its drawings show the standard
-// one (2.8 m overall). We model the upgraded, habitable-height version with a 2.4 m ceiling, so the
-// building comes out taller than the catalogue drawing (≈3.2 m to the front roof edge).
+// one (2.8 m overall). We model the upgraded, habitable-height version: a raked ceiling 2.4 m at the
+// back rising to 2.8 m at the front, so the building is taller than the catalogue drawing
+// (≈3.35 m to the front roof edge).
 //
 // The shell wraps whatever room the user has drawn; "Match Mod 10 size" resizes the room to the
 // catalogue footprint. Geometry is built in a canonical frame — front wall along +y (like the plan's
@@ -145,19 +147,61 @@ export function toCanonical(f: Frame, p: Pt): Pt {
 
 // ---------- Mod 10 ----------
 
-/** Wall heights: the front rises above the ceiling to hold the highlight windows; the back sits just above it. */
+/**
+ * Heights for a room with ceiling height H (the low, back side of the raked ceiling):
+ * the ceiling rises 400 mm to the front; walls carry on 150 mm above it to the roof; the highlight
+ * windows run across the front from just above door height to just under the ceiling.
+ */
 export function mod10Heights(room: Room) {
-  const backTop = room.height + 150;
-  const frontTop = room.height + 450;
-  return { backTop, frontTop };
+  const H = room.height;
+  return {
+    backCeiling: H,
+    frontCeiling: H + 400,
+    backTop: H + 150,
+    frontTop: H + 550,
+    highlight: { z0: H - 200, z1: H + 340 },
+  };
+}
+
+/** Highlight window spans along the canonical front (x), in the shell's outer coordinates. */
+function highlightSpans(room: Room, L: number) {
+  const t = room.wallThickness;
+  const inset = 160;
+  const mullion = 100;
+  const x0 = -t + inset;
+  const w = (L + 2 * t - 2 * inset - mullion) / 2;
+  return [x0, x0 + w + mullion].map((a) => ({ a, b: a + w }));
+}
+
+/**
+ * The room's walls under a Mod 10 roof: they rise to the sloping roof line (the raked ceiling sits
+ * just below), and the highlight windows are cut through the front wall.
+ */
+export function mod10Profile(room: Room, ext: Exterior): WallProfile {
+  const f = canonicalFrame(room, ext.front);
+  const t = room.wallThickness;
+  const { backTop, frontTop, highlight } = mod10Heights(room);
+  const yBack = -t;
+  const yFront = f.D + t;
+  const top = (p: Pt) => {
+    const y = Math.min(Math.max(toCanonical(f, p).y, yBack), yFront);
+    return backTop + ((y - yBack) / (yFront - yBack)) * (frontTop - backTop);
+  };
+  const horizontal = ext.front === 'top' || ext.front === 'bottom';
+  const gaps = highlightSpans(room, f.L).map(({ a, b }) => {
+    const pa = toPlan(f, { x: a, y: f.D + t / 2 });
+    const pb = toPlan(f, { x: b, y: f.D + t / 2 });
+    const [ua, ub] = horizontal ? [pa.x, pb.x] : [pa.y, pb.y];
+    return { wall: ext.front, offset: Math.min(ua, ub), width: Math.abs(ub - ua), sill: highlight.z0, height: highlight.z1 - highlight.z0 };
+  });
+  return { top, gaps };
 }
 
 export function mod10Parts(room: Room, openings: Opening[], ext: Exterior): { parts: ExteriorPart[]; frame: Frame } {
   const f = canonicalFrame(room, ext.front);
   const { L, D } = f;
   const t = room.wallThickness;
-  const H = room.height;
-  const { backTop, frontTop } = mod10Heights(room);
+  const { backTop, frontTop, backCeiling, frontCeiling, highlight } = mod10Heights(room);
   const clad = ext.claddingColor;
   const batten = shade(clad, -0.08);
   const parts: ExteriorPart[] = [];
@@ -173,16 +217,9 @@ export function mod10Parts(room: Room, openings: Opening[], ext: Exterior): { pa
   /** Height of the wall top at canonical y (sloping from back to front). */
   const topAt = (y: number) => backTop + ((y - yBack) / depthOut) * (frontTop - backTop);
 
-  // Highlight windows: two equal panes across the band above the ceiling on the front wall.
-  const hlInset = 160;
-  const hlMull = 100;
-  const hlZ0 = H + 70;
-  const hlZ1 = frontTop - 70;
-  const hlW = (xRight - xLeft - 2 * hlInset - hlMull) / 2;
-  const highlights: Gap[] = [0, 1].map((i) => {
-    const a = xLeft + hlInset + i * (hlW + hlMull);
-    return { a, b: a + hlW, z0: hlZ0, z1: hlZ1 };
-  });
+  // Highlight windows: two panes across the top of the front wall (cut through the room's wall
+  // too, by mod10Profile, so they're visible from inside under the raked ceiling).
+  const highlights: Gap[] = highlightSpans(room, L).map(({ a, b }) => ({ a, b, z0: highlight.z0, z1: highlight.z1 }));
 
   /**
    * A run of wall skin along one canonical wall, split around gaps. `top(u)` gives the height of
@@ -241,11 +278,6 @@ export function mod10Parts(room: Room, openings: Opening[], ext: Exterior): { pa
   run('top', xOut0, xOut1, [yBack - CLAD, yBack], () => backTop, clad, backGaps);
   run('left', yBack, yFront, [xOut0, xLeft], topAt, clad, gaps.left);
   run('right', yBack, yFront, [xRight, xOut1], topAt, clad, gaps.right);
-  // Solid infill above the ceiling, the thickness of the walls, up to the roof line.
-  run('bottom', xLeft, xRight, [D, yFront], () => frontTop, clad, highlights, H);
-  run('top', xLeft, xRight, [yBack, 0], () => backTop, clad, [], H);
-  run('left', yBack, yFront, [xLeft, 0], topAt, clad, [], H);
-  run('right', yBack, yFront, [L, xRight], topAt, clad, [], H);
 
   // Battens every 300 mm, interrupted by openings.
   const battens = (side: Wall, u0: number, u1: number, outer: number, dir: 1 | -1, top: (u: number) => number, holes: Gap[]) => {
@@ -307,7 +339,7 @@ export function mod10Parts(room: Room, openings: Opening[], ext: Exterior): { pa
 
   // Highlight glazing with a white mullion between the panes.
   for (const g of highlights) {
-    add(f.side('bottom'), { shape: 'box', x: (g.a + g.b) / 2, y: yFront - t / 2 + CLAD, z: (g.z0 + g.z1) / 2, sx: g.b - g.a, sy: 10, sz: g.z1 - g.z0, color: '#cfe3f1', glass: true });
+    add(f.side('bottom'), { shape: 'box', x: (g.a + g.b) / 2, y: D + t / 2, z: (g.z0 + g.z1) / 2, sx: g.b - g.a, sy: 10, sz: g.z1 - g.z0, color: '#cfe3f1', glass: true });
   }
 
   // Corner boards.
@@ -320,6 +352,23 @@ export function mod10Parts(room: Room, openings: Opening[], ext: Exterior): { pa
     const top = y < 0 ? backTop : frontTop;
     add(x < 0 ? f.side('left') : f.side('right'), { shape: 'box', x, y, z: top / 2 - 10, sx: 70, sy: 70, sz: top - 20, color: batten });
   }
+
+  // ---------- raked ceiling, inside, following the roof ----------
+  const ceilSlope = Math.atan2(frontCeiling - backCeiling, D);
+  const ceilDeg = (ceilSlope * 180) / Math.PI;
+  const ceilT = 20;
+  add('roof', {
+    shape: 'box',
+    x: L / 2,
+    y: D / 2,
+    z: (backCeiling + frontCeiling) / 2 + ceilT / 2 / Math.cos(ceilSlope),
+    sx: L,
+    sy: D / Math.cos(ceilSlope),
+    sz: ceilT,
+    color: '#e9e7e2',
+    unlit: true,
+    tilt: ceilDeg,
+  });
 
   // ---------- roof ----------
   const slope = Math.atan2(frontTop - backTop, depthOut + 2 * CLAD);

@@ -9,14 +9,26 @@ export interface Block {
   y0: number;
   y1: number;
   z0: number;
+  /** Top at the block's near end (x0 for top/bottom walls, y0 for left/right). */
   z1: number;
+  /** Sloping tops only: the top at the far end (x1 or y1). */
+  z1End?: number;
+}
+
+/** A raked ceiling: walls rise to `top`, and extra openings (e.g. highlight windows) are cut. */
+export interface WallProfile {
+  /** Height of the wall top over a plan point. */
+  top: (p: Pt) => number;
+  gaps: Pick<Opening, 'wall' | 'offset' | 'width' | 'sill' | 'height'>[];
 }
 
 /**
- * Wall solids for the 3D view: full-height runs between openings, plus the wall above every
- * opening (lintel) and below every window (sill). Top and bottom walls own the corners, as in 2D.
+ * Wall solids for the 3D view. Each wall is cut into vertical strips at every opening edge; in
+ * each strip the wall fills the heights no opening covers (sill below a window, lintel above a
+ * door). Openings may overlap along a wall, e.g. a door under a highlight window. Top and bottom
+ * walls own the corners, as in 2D. With a profile, walls rise to a sloping top.
  */
-export function wallBlocks(room: Room, openings: Opening[]): Block[] {
+export function wallBlocks(room: Room, openings: Opening[], profile?: WallProfile): Block[] {
   const { width: W, depth: D, height: H, wallThickness: t } = room;
   const blocks: Block[] = [];
 
@@ -28,26 +40,39 @@ export function wallBlocks(room: Room, openings: Opening[]): Block[] {
   ];
 
   for (const side of sides) {
-    const push = (a: number, b: number, z0: number, z1: number) => {
-      if (b - a <= 0.5 || z1 - z0 <= 0.5) return;
+    const mid = (side.across[0] + side.across[1]) / 2;
+    const topAt = (u: number) => (profile ? profile.top(side.horizontal ? { x: u, y: mid } : { x: mid, y: u }) : H);
+    const push = (a: number, b: number, z0: number, za: number, zb = za) => {
+      if (b - a <= 0.5 || Math.max(za, zb) - z0 <= 0.5) return;
       const [c0, c1] = side.across;
+      const sloped = Math.abs(zb - za) > 0.5 ? { z1End: zb } : {};
       blocks.push(
         side.horizontal
-          ? { wall: side.wall, x0: a, x1: b, y0: c0, y1: c1, z0, z1 }
-          : { wall: side.wall, x0: c0, x1: c1, y0: a, y1: b, z0, z1 },
+          ? { wall: side.wall, x0: a, x1: b, y0: c0, y1: c1, z0, z1: za, ...sloped }
+          : { wall: side.wall, x0: c0, x1: c1, y0: a, y1: b, z0, z1: za, ...sloped },
       );
     };
-    const gaps = openings.filter((o) => o.wall === side.wall).sort((a, b) => a.offset - b.offset);
-    let cursor = side.start;
-    for (const o of gaps) {
-      const a = o.offset;
-      const b = o.offset + o.width;
-      if (a > cursor) push(cursor, a, 0, H);
-      push(Math.max(a, cursor), b, 0, o.sill);
-      push(Math.max(a, cursor), b, o.sill + o.height, H);
-      cursor = Math.max(cursor, b);
+    const holes = [...openings, ...(profile?.gaps ?? [])]
+      .filter((o) => o.wall === side.wall)
+      .map((o) => ({ a: o.offset, b: o.offset + o.width, z0: o.sill, z1: o.sill + o.height }))
+      .filter((g) => g.b > side.start && g.a < side.end);
+    const edges = [...new Set([side.start, side.end, ...holes.flatMap((g) => [g.a, g.b])])]
+      .filter((u) => u >= side.start && u <= side.end)
+      .sort((p, q) => p - q);
+    for (let i = 0; i < edges.length - 1; i++) {
+      const a = edges[i];
+      const b = edges[i + 1];
+      const covering = holes.filter((g) => g.a < b - 0.5 && g.b > a + 0.5).sort((p, q) => p.z0 - q.z0);
+      let z = 0;
+      for (const g of covering) {
+        if (g.z0 > z) {
+          const cap = Math.min(g.z0, topAt(a), topAt(b));
+          push(a, b, z, cap);
+        }
+        z = Math.max(z, g.z1);
+      }
+      push(a, b, z, topAt(a), topAt(b));
     }
-    push(cursor, side.end, 0, H);
   }
   return blocks;
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { canonicalFrame, DEFAULT_EXTERIOR, mod10Outline, mod10Parts, mod10RoomSize, MOD10, toCanonical, toPlan, type Exterior } from './exterior';
+import { canonicalFrame, DEFAULT_EXTERIOR, mod10Heights, mod10Outline, mod10Parts, mod10Profile, mod10RoomSize, MOD10, toCanonical, toPlan, type Exterior } from './exterior';
+import { wallBlocks } from './walls3d';
 import type { Opening, Room, Wall } from './types';
 
 const room: Room = { width: 3400, depth: 2400, height: 2500, wallThickness: 100, wallColor: '#fff', floorColor: '#fff' };
@@ -76,5 +77,49 @@ describe('Mod 10 shell', () => {
   it('outlines the deck on the front side of the plan', () => {
     const { deck } = mod10Outline(room, ext('right'));
     expect(Math.min(...deck.map((p) => p.x))).toBeGreaterThan(room.width);
+  });
+});
+
+describe('Mod 10 interior (raked ceiling)', () => {
+  const h = mod10Heights(room);
+
+  it('rises 400 mm from back to front, with the walls reaching the roof line', () => {
+    expect(h.frontCeiling - h.backCeiling).toBe(400);
+    const blocks = wallBlocks(room, [door], mod10Profile(room, ext('bottom')));
+    // Side walls slope up towards the front (bottom) wall.
+    const left = blocks.filter((b) => b.wall === 'left' && b.z1End !== undefined);
+    expect(left.length).toBeGreaterThan(0);
+    for (const b of left) expect(b.z1End!).toBeGreaterThan(b.z1);
+    // The back wall stops at the low side, the front wall reaches the high side (measured along
+    // the middle of each wall, a few mm up or down the slope from the outer face).
+    expect(Math.abs(Math.max(...blocks.filter((b) => b.wall === 'top').map((b) => b.z1)) - h.backTop)).toBeLessThan(20);
+    expect(Math.abs(Math.max(...blocks.filter((b) => b.wall === 'bottom').map((b) => b.z1)) - h.frontTop)).toBeLessThan(20);
+  });
+
+  it.each(WALLS)('cuts the highlight windows through the %s (front) wall, above a door below them', (front) => {
+    const d: Opening = { ...door, wall: front, offset: 900 };
+    const blocks = wallBlocks(room, [d], mod10Profile(room, ext(front)));
+    const onFront = blocks.filter((b) => b.wall === front);
+    const horizontal = front === 'top' || front === 'bottom';
+    const covers = (u: number, z: number) =>
+      onFront.some((b) => {
+        const [u0, u1] = horizontal ? [b.x0, b.x1] : [b.y0, b.y1];
+        const top = Math.max(b.z1, b.z1End ?? b.z1);
+        return u > u0 && u < u1 && z > b.z0 && z < top;
+      });
+    const mid = (horizontal ? room.width : room.depth) / 2;
+    const quarter = mid / 2;
+    const zHighlight = (h.highlight.z0 + h.highlight.z1) / 2;
+    expect(covers(quarter, zHighlight)).toBe(false); // highlight pane
+    expect(covers(1000, 1000)).toBe(false); // the door
+    expect(covers(1000, 2150)).toBe(true); // wall between the door head and the highlight
+    expect(covers(mid, zHighlight)).toBe(true); // the mullion between the panes
+  });
+
+  it('includes an evenly lit raked ceiling in the shell', () => {
+    const { parts } = mod10Parts(room, [], ext('bottom'));
+    const ceiling = parts.find((p) => p.unlit);
+    expect(ceiling).toBeDefined();
+    expect(ceiling!.tilt).toBeGreaterThan(0);
   });
 });

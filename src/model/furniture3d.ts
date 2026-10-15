@@ -35,6 +35,8 @@ export interface Part {
   topFront?: number;
   /** Draw with the glass material. */
   glass?: boolean;
+  /** Evenly lit, no shading (ceilings). */
+  unlit?: boolean;
 }
 
 export const COLORS = {

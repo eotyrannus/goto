@@ -12,7 +12,7 @@ import { depthExtent, openingFrame, frameToWorld } from '../model/geometry';
 import type { Design, DoorMaterial, FurnitureItem, Opening, OpeningKind, Room, Wall } from '../model/types';
 import { DOOR_OPEN, doorLeafSegments, wallBlocks, type Block } from '../model/walls3d';
 import { isBlocked, walkWorld } from '../model/walkable';
-import { FLOOR_RAISE, mod10Parts } from '../model/exterior';
+import { FLOOR_RAISE, mod10Parts, mod10Profile } from '../model/exterior';
 import { useDesign } from '../store/designStore';
 import { scene3dApi } from './api';
 import { useDoors } from './doors';
@@ -54,6 +54,12 @@ function material(color: string, glow = false) {
 const GLASS = new THREE.MeshPhysicalMaterial({ color: '#cfe3f1', transparent: true, opacity: 0.28, roughness: 0.05, depthWrite: false });
 /** Door glass reads a little stronger than window glass so the door is visible when shut. */
 const DOOR_GLASS = new THREE.MeshPhysicalMaterial({ color: '#b9d3e6', transparent: true, opacity: 0.42, roughness: 0.05, depthWrite: false });
+/** Evenly lit surfaces (ceilings), which would otherwise only catch the dim underside of the lights. */
+const unlits = new Map<string, THREE.MeshBasicMaterial>();
+function unlit(color: string) {
+  if (!unlits.has(color)) unlits.set(color, new THREE.MeshBasicMaterial({ color }));
+  return unlits.get(color)!;
+}
 const metals = new Map<string, THREE.MeshStandardMaterial>();
 function metal(color: string) {
   if (!metals.has(color)) metals.set(color, new THREE.MeshStandardMaterial({ color, roughness: 0.32, metalness: 0.65 }));
@@ -136,16 +142,38 @@ function Cutaway({
   return null;
 }
 
+/** A wall block: a box, or a wedge when its top slopes along the wall. */
+function BlockMesh({ b, material, shadow = false }: { b: Block; material: THREE.Material | THREE.Material[]; shadow?: boolean }) {
+  if (b.z1End === undefined) return <mesh geometry={BOX} material={material} {...blockProps(b)} castShadow={shadow} receiveShadow />;
+  const along: 'x' | 'y' = b.wall === 'top' || b.wall === 'bottom' ? 'x' : 'y';
+  return (
+    <mesh
+      geometry={wedge((b.x1 - b.x0) * M, (b.y1 - b.y0) * M, (b.z1 - b.z0) * M, (b.z1End - b.z0) * M, along)}
+      material={material}
+      position={[((b.x0 + b.x1) / 2) * M, b.z0 * M, ((b.y0 + b.y1) / 2) * M]}
+      castShadow={shadow}
+      receiveShadow
+    />
+  );
+}
+
+const CEILING = '#e9e7e2';
+
 function Room3D({ design, mode, inside }: { design: Design; mode: Mode; inside: boolean }) {
   const { room, openings } = design;
-  const blocks = useMemo(() => wallBlocks(room, openings), [room, openings]);
+  const { exterior } = design;
+  // Under a Mod 10 roof the walls rise to the raked ceiling and the highlight windows cut through.
+  const blocks = useMemo(
+    () => wallBlocks(room, openings, exterior.style === 'mod10' ? mod10Profile(room, exterior) : undefined),
+    [room, openings, exterior],
+  );
   const groups = useRef<Record<string, THREE.Group | null>>({});
   const wallMats = useWallMaterials(room.wallColor);
   const shell = design.exterior.style !== 'none';
   const W = room.width * M;
   const D = room.depth * M;
   const H = room.height * M;
-  const stubs = useMemo(() => blocks.filter((b) => b.z0 < STUB).map((b) => ({ ...b, z1: Math.min(b.z1, STUB) })), [blocks]);
+  const stubs = useMemo(() => blocks.filter((b) => b.z0 < STUB).map((b) => ({ ...b, z1: Math.min(b.z1, STUB), z1End: undefined })), [blocks]);
   // Openings on a cut-away wall are hidden along with it (door leaves stay: they're in the room).
   return (
     <group>
@@ -160,18 +188,20 @@ function Room3D({ design, mode, inside }: { design: Design; mode: Mode; inside: 
         <planeGeometry args={[W, D]} />
         <meshStandardMaterial color={room.floorColor} roughness={0.9} />
       </mesh>
-      <mesh rotation-x={Math.PI / 2} position={[W / 2, H, D / 2]}>
-        <planeGeometry args={[W, D]} />
-        {/* Lit evenly: a ceiling only catches the dim underside of the scene lights. */}
-        <meshBasicMaterial color="#e9e7e2" />
-      </mesh>
+      {!shell && (
+        <mesh rotation-x={Math.PI / 2} position={[W / 2, H, D / 2]}>
+          <planeGeometry args={[W, D]} />
+          {/* Lit evenly: a ceiling only catches the dim underside of the scene lights. */}
+          <meshBasicMaterial color={CEILING} />
+        </mesh>
+      )}
       {WALLS.map((w) => (
         <group key={w}>
           <group ref={(g) => void (groups.current[`full-${w}`] = g)} userData={{ wallFull: true }}>
             {blocks
               .filter((b) => b.wall === w)
               .map((b, i) => (
-                <mesh key={i} geometry={BOX} material={wallMats} {...blockProps(b)} castShadow receiveShadow />
+                <BlockMesh key={i} b={b} material={wallMats} shadow />
               ))}
             {openings
               .filter((o) => o.wall === w && o.kind !== 'door' && o.kind !== 'double-door')
@@ -183,7 +213,7 @@ function Room3D({ design, mode, inside }: { design: Design; mode: Mode; inside: 
             {stubs
               .filter((b) => b.wall === w)
               .map((b, i) => (
-                <mesh key={i} geometry={BOX} material={wallMats} {...blockProps(b)} receiveShadow />
+                <BlockMesh key={i} b={b} material={wallMats} />
               ))}
           </group>
         </group>
@@ -366,14 +396,15 @@ function DoorPanel({ len, height, thick, kind, color, sliding = false }: { len: 
 
 /** Wedges (boxes with a sloping top) are built at real size, like rounded boxes. */
 const wedges = new Map<string, THREE.BufferGeometry>();
-function wedge(sx: number, sy: number, back: number, front: number) {
-  const key = [sx, sy, back, front].map((v) => v.toFixed(4)).join('|');
+function wedge(sx: number, sy: number, back: number, front: number, axis: 'x' | 'y' = 'y') {
+  const key = [sx, sy, back, front].map((v) => v.toFixed(4)).join('|') + axis;
   if (!wedges.has(key)) {
     const g = new THREE.BoxGeometry(sx, 1, sy);
     const pos = g.attributes.position;
     for (let i = 0; i < pos.count; i++) {
-      // Bottom at 0; top at `back` on the -Z (plan -y) end and `front` on the +Z end.
-      pos.setY(i, pos.getY(i) > 0 ? (pos.getZ(i) < 0 ? back : front) : 0);
+      // Bottom at 0; the top slopes from `back` at the low end of the axis (plan -y, or -x) to `front`.
+      const low = axis === 'y' ? pos.getZ(i) < 0 : pos.getX(i) < 0;
+      pos.setY(i, pos.getY(i) > 0 ? (low ? back : front) : 0);
     }
     g.computeVertexNormals();
     wedges.set(key, g);
@@ -405,7 +436,11 @@ function Exterior3D({ design, groups }: { design: Design; groups: RefObject<Reco
 // ---------- furniture ----------
 
 function PartMesh({ p }: { p: Part }) {
-  const common = { material: p.glass ? GLASS : material(p.color, p.glow), castShadow: !p.glass, receiveShadow: true };
+  const common = {
+    material: p.glass ? GLASS : p.unlit ? unlit(p.color) : material(p.color, p.glow),
+    castShadow: !p.glass && !p.unlit,
+    receiveShadow: !p.unlit,
+  };
   const position: [number, number, number] = [p.x * M, p.z * M, p.y * M];
   const tilt = -THREE.MathUtils.degToRad(p.tilt ?? 0);
   if (p.shape === 'wedge') {
