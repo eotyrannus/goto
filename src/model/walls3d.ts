@@ -52,16 +52,23 @@ export function wallBlocks(room: Room, openings: Opening[]): Block[] {
   return blocks;
 }
 
-/** How far doors are drawn open in 3D (0 = shut, 1 = fully open). */
-export const DOOR_OPEN = 0.55;
+/** How far doors open in 3D (0 = shut, 1 = square to the wall). */
+export const DOOR_OPEN = 0.9;
 
-/** Door leaves as plan-space segments (hinge → free end), drawn part-open on their real swing. */
-export function doorLeafSegments(room: Room, o: Opening): { hinge: Pt; end: Pt }[] {
+/** Door leaves as plan-space segments (hinge → free end) at `amount` open (0 = shut, 1 = fully open). */
+export function doorLeafSegments(room: Room, o: Opening, amount = DOOR_OPEN): { hinge: Pt; end: Pt }[] {
   const frame = openingFrame(room, o);
   return doorLeaves(o, room.wallThickness).map((leaf) => {
-    // arc[0] is the hinge; arc[1..] runs from shut to fully open.
-    const steps = leaf.arc.length - 2;
-    const p = leaf.arc[1 + Math.round(steps * DOOR_OPEN)];
-    return { hinge: frameToWorld(frame, leaf.hinge), end: frameToWorld(frame, p) };
+    // arc[0] is the hinge, arc[1] the shut position; rotate from shut towards fully open.
+    const shut = leaf.arc[1];
+    const len = Math.hypot(shut.x - leaf.hinge.x, shut.y - leaf.hinge.y);
+    const a0 = Math.atan2(shut.y - leaf.hinge.y, shut.x - leaf.hinge.x);
+    const a1 = Math.atan2(leaf.open.y - leaf.hinge.y, leaf.open.x - leaf.hinge.x);
+    let sweep = a1 - a0;
+    if (sweep > Math.PI) sweep -= 2 * Math.PI;
+    if (sweep <= -Math.PI) sweep += 2 * Math.PI;
+    const a = a0 + sweep * amount;
+    const end = { x: leaf.hinge.x + Math.cos(a) * len, y: leaf.hinge.y + Math.sin(a) * len };
+    return { hinge: frameToWorld(frame, leaf.hinge), end: frameToWorld(frame, end) };
   });
 }

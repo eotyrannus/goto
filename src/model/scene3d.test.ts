@@ -4,8 +4,8 @@ import { furnitureParts, hasModel } from './furniture3d';
 import { doorLeafSegments, wallBlocks } from './walls3d';
 import type { Opening } from './types';
 
-const room = { width: 3000, depth: 2000, height: 2500, wallThickness: 100 };
-const opening = (p: Partial<Opening>): Opening => ({ id: 'o', kind: 'door', wall: 'top', offset: 1000, width: 900, height: 2100, sill: 0, hinge: 'start', swing: 'in', ...p });
+const room = { width: 3000, depth: 2000, height: 2500, wallThickness: 100, wallColor: '#ffffff', floorColor: '#ffffff' };
+const opening = (p: Partial<Opening>): Opening => ({ id: 'o', kind: 'door', wall: 'top', offset: 1000, width: 900, height: 2100, sill: 0, color: '#d8c3a0', hinge: 'start', swing: 'in', ...p });
 const volume = (bs: ReturnType<typeof wallBlocks>) => bs.reduce((v, b) => v + (b.x1 - b.x0) * (b.y1 - b.y0) * (b.z1 - b.z0), 0);
 
 describe('wallBlocks', () => {
@@ -47,6 +47,13 @@ describe('doorLeafSegments', () => {
     expect(leaf.end.y).toBeGreaterThan(300);
     expect(Math.hypot(leaf.end.x - 1000, leaf.end.y)).toBeCloseTo(900);
   });
+  it('closes flush in the wall and opens square to it', () => {
+    const [shut] = doorLeafSegments(room, opening({}), 0);
+    expect(shut.end.x).toBeCloseTo(1900);
+    expect(shut.end.y).toBeCloseTo(0);
+    const [open] = doorLeafSegments(room, opening({ wall: 'left', hinge: 'end' }), 1);
+    expect(open.end.x).toBeCloseTo(900);
+  });
   it('draws an outward door outside the wall', () => {
     const [leaf] = doorLeafSegments(room, opening({ swing: 'out' }));
     expect(leaf.end.y).toBeLessThan(-100);
@@ -73,5 +80,15 @@ describe('furnitureParts', () => {
         expect(p.sz).toBeGreaterThan(0);
       }
     }
+  });
+});
+
+describe('furniture colours', () => {
+  it.each(CATALOG.map((c) => [c.type, c] as const))('%s is drawn in its default colour and can be recoloured', (type, c) => {
+    const plain = furnitureParts(type, c.width, c.depth, c.height, c.color, c.color);
+    expect(plain.some((p) => p.color.toLowerCase() === c.color.toLowerCase())).toBe(true);
+    const red = furnitureParts(type, c.width, c.depth, c.height, '#cc2222', c.color);
+    expect(red.some((p) => p.color === '#cc2222')).toBe(true);
+    expect(red.some((p) => p.color.toLowerCase() === c.color.toLowerCase())).toBe(false);
   });
 });

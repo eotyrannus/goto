@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CATALOG_BY_TYPE, OPENING_BY_KIND, OPENINGS } from '../model/catalog';
 import { findIssues, ISSUE_TEXT } from '../model/clashes';
 import { wallLength } from '../model/geometry';
 import type { FurnitureItem, Opening, Wall } from '../model/types';
 import { cmToMm, formatArea, mmToCm } from '../model/units';
+import { ROOM_COLORS } from '../model/color';
 import { useDesign } from '../store/designStore';
 
 /** Numeric field that edits a millimetre value in centimetres; commits on Enter or blur. */
@@ -57,6 +58,86 @@ export function TextField({ label, value, placeholder, onChange }: { label: stri
   );
 }
 
+const SWATCHES = [
+  '#ffffff', '#f1efea', '#d9d4ca', '#a7a196', '#5b5f66', '#2f3237',
+  '#e6dac6', '#c8a47a', '#8a6a4b', '#8ea2b6', '#4f6d8f', '#6c9a58',
+  '#b9a3c4', '#c97b63', '#d9b44a', '#9e3b3b',
+];
+
+/**
+ * Colour picker plus quick swatches. Dragging inside the native picker previews live and is
+ * recorded as a single undo step when the picker closes.
+ */
+function ColorField({
+  label,
+  value,
+  defaultColor,
+  onChange,
+  testId,
+}: {
+  label: string;
+  value: string;
+  defaultColor?: string;
+  onChange: (color: string, live: boolean) => void;
+  testId?: string;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  const editing = useRef(false);
+  useEffect(() => {
+    const el = input.current;
+    if (!el) return;
+    // React's onChange fires on every 'input'; the native 'change' fires once the picker closes.
+    const done = () => {
+      if (!editing.current) return;
+      editing.current = false;
+      useDesign.getState().endGesture();
+    };
+    el.addEventListener('change', done);
+    el.addEventListener('blur', done);
+    return () => {
+      el.removeEventListener('change', done);
+      el.removeEventListener('blur', done);
+    };
+  }, []);
+  return (
+    <div className="field">
+      <span>{label}</span>
+      <div className="color-row">
+        <input
+          ref={input}
+          type="color"
+          value={value}
+          data-testid={testId}
+          onChange={(e) => {
+            if (!editing.current) {
+              editing.current = true;
+              useDesign.getState().beginGesture();
+            }
+            onChange(e.target.value, true);
+          }}
+        />
+        <div className="swatches">
+          {SWATCHES.map((c) => (
+            <button
+              key={c}
+              className={c.toLowerCase() === value.toLowerCase() ? 'on' : ''}
+              style={{ background: c }}
+              title={c}
+              aria-label={`Colour ${c}`}
+              onClick={() => onChange(c, false)}
+            />
+          ))}
+        </div>
+      </div>
+      {defaultColor && defaultColor.toLowerCase() !== value.toLowerCase() && (
+        <button className="link reset-color" onClick={() => onChange(defaultColor, false)}>
+          Reset to default colour
+        </button>
+      )}
+    </div>
+  );
+}
+
 function AngleField({ deg, onChange }: { deg: number; onChange: (deg: number) => void }) {
   const [text, setText] = useState(String(deg));
   useEffect(() => setText(String(deg)), [deg]);
@@ -90,6 +171,10 @@ function RoomProps() {
       <div className="grid2">
         <LengthField label="Ceiling height" mm={room.height} onChange={(height) => updateRoom({ height })} testId="room-height" />
         <LengthField label="Wall thickness" mm={room.wallThickness} onChange={(wallThickness) => updateRoom({ wallThickness })} />
+      </div>
+      <div className="grid2">
+        <ColorField label="Wall colour" value={room.wallColor} defaultColor={ROOM_COLORS.wall} onChange={(wallColor, live) => updateRoom({ wallColor }, live)} testId="wall-color" />
+        <ColorField label="Floor colour" value={room.floorColor} defaultColor={ROOM_COLORS.floor} onChange={(floorColor, live) => updateRoom({ floorColor }, live)} testId="floor-color" />
       </div>
       <p className="muted">
         Floor area <strong>{formatArea(room.width * room.depth)}</strong>
@@ -138,6 +223,7 @@ function ItemProps({ it }: { it: FurnitureItem }) {
           <button onClick={() => patch({ rotation: it.rotation + 90 })} title="Rotate 90°">⟳</button>
         </div>
       </div>
+      <ColorField label="Colour" value={it.color} defaultColor={entry?.color} onChange={(color, live) => s.updateItems({ [it.id]: { color } }, live)} testId="item-color" />
       {entry && (
         <p className="hint">
           Size range {mmToCm(entry.min[0])}–{mmToCm(entry.max[0])} × {mmToCm(entry.min[1])}–{mmToCm(entry.max[1])} ×{' '}
@@ -182,8 +268,9 @@ function OpeningProps({ o }: { o: Opening }) {
           onChange={(e) => {
             // Switching between doors and windows also swaps in that kind's usual height and sill.
             const kind = e.target.value as Opening['kind'];
-            const { height, sill } = OPENING_BY_KIND[kind];
-            patch({ kind, height, sill });
+            const { height, sill, color } = OPENING_BY_KIND[kind];
+            const customColour = o.color !== OPENING_BY_KIND[o.kind].color;
+            patch({ kind, height, sill, ...(customColour ? {} : { color }) });
           }}
         >
           {OPENINGS.map((x) => (
@@ -209,6 +296,15 @@ function OpeningProps({ o }: { o: Opening }) {
           <div />
         )}
       </div>
+      {o.kind !== 'opening' && (
+        <ColorField
+          label={o.kind === 'window' ? 'Frame colour' : 'Door colour'}
+          value={o.color}
+          defaultColor={OPENING_BY_KIND[o.kind].color}
+          onChange={(color, live) => s.updateOpening(o.id, { color }, live)}
+          testId="opening-color"
+        />
+      )}
       <p className="hint">Wall length {mmToCm(wallLength(room, o.wall))} cm. Drag along the wall to move; drag to another wall to re-hang.</p>
       {isDoor && (
         <div className="grid2">
@@ -238,11 +334,17 @@ function OpeningProps({ o }: { o: Opening }) {
   );
 }
 
-function MultiProps({ count }: { count: number }) {
+function MultiProps({ items }: { items: FurnitureItem[] }) {
   const s = useDesign();
+  const same = items.every((it) => it.color === items[0].color);
   return (
     <>
-      <h2>{count} items selected</h2>
+      <h2>{items.length} items selected</h2>
+      <ColorField
+        label={same ? 'Colour' : 'Colour (mixed)'}
+        value={items[0].color}
+        onChange={(color, live) => s.updateItems(Object.fromEntries(items.map((it) => [it.id, { color }])), live)}
+      />
       <div className="btn-row wrap">
         <button onClick={() => s.rotateSelection(90)}>Rotate 90°</button>
         <button onClick={s.duplicateSelection}>Duplicate</button>
@@ -263,7 +365,7 @@ export function PropertiesPanel() {
   } else if (selection?.kind === 'items') {
     const sel = design.items.filter((it) => selection.ids.includes(it.id));
     if (sel.length === 1) body = <ItemProps it={sel[0]} />;
-    else if (sel.length > 1) body = <MultiProps count={sel.length} />;
+    else if (sel.length > 1) body = <MultiProps items={sel} />;
   }
   return <aside className="panel props" data-testid="properties">{body}</aside>;
 }

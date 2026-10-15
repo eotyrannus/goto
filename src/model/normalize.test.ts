@@ -24,8 +24,8 @@ describe('normalizeDesign', () => {
       id: 'x',
       name: 'n',
       updatedAt: 0,
-      room: { width: 3000, depth: 2000, height: 3100, wallThickness: 100 },
-      items: [{ id: 'a', type: 'desk', x: 0, y: 0, width: 1, depth: 1, height: 1050, elevation: 0, rotation: 0 }],
+      room: { width: 3000, depth: 2000, height: 3100, wallThickness: 100, wallColor: '#ffffff', floorColor: '#ffffff' },
+      items: [{ id: 'a', type: 'desk', x: 0, y: 0, width: 1, depth: 1, height: 1050, elevation: 0, color: '#ffffff', rotation: 0 }],
       openings: [],
     });
     expect(d.room.height).toBe(3100);

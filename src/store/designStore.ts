@@ -5,6 +5,7 @@ import type { Design, FurnitureItem, Opening, OpeningKind, Room, Selection, Sett
 import { uid } from '../model/units';
 import { templates } from '../model/templates';
 import { normalizeDesign } from '../model/normalize';
+import { isHex } from '../model/color';
 
 const HISTORY_LIMIT = 200;
 
@@ -33,7 +34,7 @@ interface State {
   rename: (name: string) => void;
   updateRoom: (patch: Partial<Room>, live?: boolean) => void;
   addItem: (type: string, at?: Pt) => void;
-  updateItems: (patches: Record<string, Partial<FurnitureItem>>) => void;
+  updateItems: (patches: Record<string, Partial<FurnitureItem>>, live?: boolean) => void;
   addOpening: (kind: OpeningKind, at?: Pt) => void;
   updateOpening: (id: string, patch: Partial<Opening>, live?: boolean) => void;
   deleteSelection: () => void;
@@ -73,7 +74,7 @@ export const useDesign = create<State>((set, get) => {
     future: [],
     gestureStart: null,
     selection: null,
-    settings: { gridSize: 100, showGrid: true, snap: true, showNames: false, showClearances: true, showClashes: true },
+    settings: { gridSize: 100, showGrid: true, snap: true, showNames: false, showClearances: true, showClashes: true, colorPlan: true },
 
     loadDesign: (d) => set({ design: normalizeDesign(d), past: [], future: [], selection: null, gestureStart: null }),
     commit,
@@ -127,6 +128,7 @@ export const useDesign = create<State>((set, get) => {
         depth: entry.depth,
         height: entry.height,
         elevation: entry.elevation,
+        color: entry.color,
         rotation: 0,
       };
       // Keep a freshly placed item inside the room when it fits.
@@ -139,9 +141,9 @@ export const useDesign = create<State>((set, get) => {
       set({ selection: { kind: 'items', ids: [item.id] } });
     },
 
-    updateItems: (patches) => {
+    updateItems: (patches, live = false) => {
       const d = get().design;
-      commit({
+      (live ? get().updateLive : commit)({
         ...d,
         items: d.items.map((it) => {
           const p = patches[it.id];
@@ -157,6 +159,7 @@ export const useDesign = create<State>((set, get) => {
           next.x = Math.round(next.x);
           next.y = Math.round(next.y);
           next.rotation = normalizeAngle(next.rotation);
+          if (!isHex(next.color)) next.color = it.color;
           return next;
         }),
       });
@@ -181,6 +184,7 @@ export const useDesign = create<State>((set, get) => {
         width,
         height: entry.height,
         sill: entry.sill,
+        color: entry.color,
         hinge: 'start' as const,
         swing: 'in' as const,
       });

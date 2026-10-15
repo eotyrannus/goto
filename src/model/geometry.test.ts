@@ -14,9 +14,9 @@ import { findIssues } from './clashes';
 import { newDesign } from './templates';
 import type { FurnitureItem, Opening } from './types';
 
-const room = { width: 3000, depth: 2000, height: 2500, wallThickness: 100 };
-const item = (p: Partial<FurnitureItem>): FurnitureItem => ({ id: 'a', type: 'desk', x: 500, y: 500, width: 1000, depth: 500, height: 740, elevation: 0, rotation: 0, ...p });
-const door = (p: Partial<Opening>): Opening => ({ id: 'd', kind: 'door', wall: 'top', offset: 1000, width: 900, height: 2100, sill: 0, hinge: 'start', swing: 'in', ...p });
+const room = { width: 3000, depth: 2000, height: 2500, wallThickness: 100, wallColor: '#ffffff', floorColor: '#ffffff' };
+const item = (p: Partial<FurnitureItem>): FurnitureItem => ({ id: 'a', type: 'desk', x: 500, y: 500, width: 1000, depth: 500, height: 740, elevation: 0, color: '#ffffff', rotation: 0, ...p });
+const door = (p: Partial<Opening>): Opening => ({ id: 'd', kind: 'door', wall: 'top', offset: 1000, width: 900, height: 2100, sill: 0, color: '#d8c3a0', hinge: 'start', swing: 'in', ...p });
 
 describe('item bounds', () => {
   it('swaps extents when rotated 90°', () => {

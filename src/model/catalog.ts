@@ -1,3 +1,4 @@
+import { COLORS } from './furniture3d';
 import type { OpeningKind } from './types';
 
 /**
@@ -18,6 +19,8 @@ export interface CatalogEntry {
   height: number;
   /** Default mounting height (underside above the floor). */
   elevation: number;
+  /** Default main colour; must match the colour the 3D builder uses for the item's main parts. */
+  color: string;
   /** [width, depth, height] limits. */
   min: [number, number, number];
   max: [number, number, number];
@@ -35,6 +38,7 @@ const e = (
   elevation = 0,
 ): CatalogEntry => ({
   elevation,
+  color: MAIN_COLOR[type] ?? COLORS.white,
   type,
   name,
   category,
@@ -46,6 +50,27 @@ const e = (
   min: [...min, layer === 'floor' ? 2 : Math.round((height * 0.4) / 10) * 10],
   max: [...max, 3000],
 });
+
+const MAIN_COLOR: Record<string, string> = {
+  'office-chair': COLORS.fabric,
+  'table-rect': COLORS.wood,
+  'table-round': COLORS.wood,
+  chair: COLORS.fabricWarm,
+  stool: COLORS.wood,
+  sofa: COLORS.fabric,
+  armchair: COLORS.fabric,
+  'coffee-table': COLORS.wood,
+  'side-table': COLORS.wood,
+  bookshelf: COLORS.wood,
+  sideboard: COLORS.wood,
+  whiteboard: '#ffffff',
+  tv: COLORS.dark,
+  partition: COLORS.felt,
+  plant: COLORS.pot,
+  'floor-lamp': COLORS.shade,
+  'coat-rack': COLORS.woodDark,
+  rug: COLORS.rug,
+};
 
 export const CATALOG: CatalogEntry[] = [
   e('desk', 'Desk', 'Work', [1400, 700, 740], 'furniture', [600, 400]),
@@ -90,14 +115,15 @@ export interface OpeningEntry {
   width: number;
   height: number;
   sill: number;
+  color: string;
 }
 
 export const OPENINGS: OpeningEntry[] = [
-  { kind: 'door', name: 'Door', width: 900, height: 2100, sill: 0 },
-  { kind: 'double-door', name: 'Double door', width: 1600, height: 2100, sill: 0 },
-  { kind: 'sliding-door', name: 'Sliding door', width: 1200, height: 2100, sill: 0 },
-  { kind: 'window', name: 'Window', width: 1200, height: 1200, sill: 900 },
-  { kind: 'opening', name: 'Opening', width: 900, height: 2100, sill: 0 },
+  { kind: 'door', name: 'Door', width: 900, height: 2100, sill: 0, color: COLORS.door },
+  { kind: 'double-door', name: 'Double door', width: 1600, height: 2100, sill: 0, color: COLORS.door },
+  { kind: 'sliding-door', name: 'Sliding door', width: 1200, height: 2100, sill: 0, color: COLORS.door },
+  { kind: 'window', name: 'Window', width: 1200, height: 1200, sill: 900, color: '#ffffff' },
+  { kind: 'opening', name: 'Opening', width: 900, height: 2100, sill: 0, color: COLORS.door },
 ];
 
 export const OPENING_BY_KIND = Object.fromEntries(OPENINGS.map((o) => [o.kind, o])) as Record<OpeningKind, OpeningEntry>;

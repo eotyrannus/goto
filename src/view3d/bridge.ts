@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import type { Pt } from '../model/geometry';
 import { scene3dApi } from './api';
+import { useDoors } from './doors';
 
 interface Live {
   gl: THREE.WebGLRenderer;
@@ -24,6 +25,8 @@ export function detach() {
 }
 
 const impl = {
+  doorShut: (id: string) => !!useDoors.getState().shut[id],
+
   /** Plan point (mm) on the floor under a screen position. */
   floorPoint(clientX: number, clientY: number): Pt | null {
     if (!live) return null;
@@ -36,10 +39,12 @@ const impl = {
     return { x: hit.x * 1000, y: hit.z * 1000 };
   },
 
-  /** Screen position of an item's centre (for tests). */
-  project(itemId: string): Pt | null {
+  /** Screen position of an item's or door's centre (for tests). */
+  project(id: string): Pt | null {
     if (!live) return null;
-    const obj = live.scene.getObjectByName(`item-${itemId}`);
+    const door = live.scene.getObjectByName(`door-${id}`);
+    // For doors aim at the first leaf: a double door's middle is empty space when it's open.
+    const obj = live.scene.getObjectByName(`item-${id}`) ?? door?.children[door.children.length - 1];
     if (!obj) return null;
     const box = new THREE.Box3().setFromObject(obj);
     const c = box.getCenter(new THREE.Vector3()).project(live.camera);

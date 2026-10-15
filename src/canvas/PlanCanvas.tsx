@@ -20,7 +20,7 @@ import type { FurnitureItem, Opening, OpeningKind, Room } from '../model/types';
 import { formatLength } from '../model/units';
 import { useDesign } from '../store/designStore';
 import { FONT, Grid, OpeningSymbol, RoomDimensions, Walls, annotationSize } from './RoomShapes';
-import { FurnitureSymbol, INK } from './symbols/Symbols';
+import { FurnitureSymbol, INK, planTint } from './symbols/Symbols';
 
 export const DND_MIME = 'application/x-podplanner';
 
@@ -419,7 +419,7 @@ export function PlanCanvas() {
       onMouseEnter={() => !panKey && setCursor(it.locked ? 'not-allowed' : 'move')}
       onMouseLeave={() => !panKey && setCursor('default')}
     >
-      <FurnitureSymbol type={it.type} w={it.width} d={it.depth} />
+      <FurnitureSymbol type={it.type} w={it.width} d={it.depth} color={settings.colorPlan ? it.color : undefined} />
       <Rect x={-it.width / 2} y={-it.depth / 2} width={it.width} height={it.depth} fill="rgba(0,0,0,0)" />
     </Group>
   );
@@ -449,7 +449,7 @@ export function PlanCanvas() {
           onContextMenu={(e) => e.evt.preventDefault()}
         >
           <Layer name="grid" listening={false}>
-            <Grid room={room} grid={settings.gridSize} scale={view.scale} show={settings.showGrid} />
+            <Grid room={room} grid={settings.gridSize} scale={view.scale} show={settings.showGrid} floor={settings.colorPlan ? planTint(room.floorColor, 0.75) : undefined} />
           </Layer>
 
           <Layer name="content">

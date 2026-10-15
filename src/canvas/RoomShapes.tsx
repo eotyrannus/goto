@@ -121,7 +121,7 @@ export function RoomDimensions({ room }: { room: Room }) {
   );
 }
 
-export function Grid({ room, grid, scale, show }: { room: Room; grid: number; scale: number; show: boolean }) {
+export function Grid({ room, grid, scale, show, floor = '#ffffff' }: { room: Room; grid: number; scale: number; show: boolean; floor?: string }) {
   const { width: W, depth: D } = room;
   const lines = [];
   if (show && grid > 0) {
@@ -139,7 +139,7 @@ export function Grid({ room, grid, scale, show }: { room: Room; grid: number; sc
   }
   return (
     <>
-      <Rect x={0} y={0} width={W} height={D} fill="#ffffff" />
+      <Rect x={0} y={0} width={W} height={D} fill={floor} />
       {lines}
     </>
   );

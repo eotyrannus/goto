@@ -103,3 +103,57 @@ test('exports the 3D view as PNG and as a glTF model', async ({ page }) => {
   expect(bytes.subarray(0, 4).toString()).toBe('glTF');
   expect(bytes.length).toBeGreaterThan(10_000);
 });
+
+test('clicking a door in 3D shuts it and clicking again opens it', async ({ page }) => {
+  await open3d(page, 'Duo pod');
+  const door = (await design(page)).openings.find((o: any) => o.kind === 'door');
+  const shut = () => page.evaluate((id) => (window as any).__pod.three.doorShut(id), door.id);
+  expect(await shut()).toBe(false);
+  const at = await page.evaluate((id) => (window as any).__pod.three.project(id), door.id);
+  await page.mouse.click(at.x, at.y);
+  expect(await shut()).toBe(true);
+  await page.waitForTimeout(800); // let it swing
+  const at2 = await page.evaluate((id) => (window as any).__pod.three.project(id), door.id);
+  await page.mouse.click(at2.x, at2.y);
+  expect(await shut()).toBe(false);
+  // Opening and closing doors is a viewing aid: it doesn't touch the saved design or undo history.
+  expect(await page.evaluate(() => (window as any).__pod.store.getState().past.length)).toBe(0);
+});
+
+test('colours: items, doors, walls and floor', async ({ page }) => {
+  await open3d(page, 'Focus pod');
+  const desk = (await design(page)).items.find((it: any) => it.type === 'desk');
+  await page.evaluate((id) => (window as any).__pod.store.getState().setSelection({ kind: 'items', ids: [id] }), desk.id);
+  await page.getByLabel('Colour #9e3b3b').click();
+  expect((await design(page)).items.find((it: any) => it.id === desk.id).color).toBe('#9e3b3b');
+  await page.getByText('Reset to default colour').click();
+  expect((await design(page)).items.find((it: any) => it.id === desk.id).color).toBe('#f1efea');
+
+  const door = (await design(page)).openings.find((o: any) => o.kind === 'door');
+  await page.evaluate((id) => (window as any).__pod.store.getState().setSelection({ kind: 'opening', id }), door.id);
+  await page.getByLabel('Colour #4f6d8f').click();
+  expect((await design(page)).openings.find((o: any) => o.id === door.id).color).toBe('#4f6d8f');
+
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => (window as any).__pod.store.getState().setSelection(null));
+  await page.getByTestId('wall-color').locator('..').getByLabel('Colour #e6dac6').click();
+  await page.getByTestId('floor-color').locator('..').getByLabel('Colour #8a6a4b').click();
+  const room = (await design(page)).room;
+  expect(room.wallColor).toBe('#e6dac6');
+  expect(room.floorColor).toBe('#8a6a4b');
+
+  // The native picker previews live and lands as one undo step.
+  const before = await page.evaluate(() => (window as any).__pod.store.getState().past.length);
+  await page.getByTestId('wall-color').evaluate((el: HTMLInputElement) => {
+    const set = (v: string) => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(el, v);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    set('#111111');
+    set('#222222');
+    set('#333333');
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  expect((await design(page)).room.wallColor).toBe('#333333');
+  expect(await page.evaluate(() => (window as any).__pod.store.getState().past.length)).toBe(before + 1);
+});

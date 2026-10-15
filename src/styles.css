@@ -171,3 +171,12 @@ input:focus, select:focus { outline: 2px solid var(--accent-soft); border-color:
 .scene3d-controls button { border: none; }
 .scene3d-hint { position: absolute; left: 12px; bottom: 14px; font-size: 12px; color: #4b5563; background: rgba(255, 255, 255, 0.85); padding: 4px 8px; border-radius: 6px; pointer-events: none; }
 .tip3d { background: #111827; color: #fff; font-size: 11px; padding: 3px 7px; border-radius: 4px; white-space: nowrap; }
+
+/* ---- colour picker ---- */
+.color-row { display: flex; gap: 8px; align-items: flex-start; }
+.color-row input[type='color'] { width: 34px; height: 34px; padding: 2px; border-radius: 6px; flex: none; cursor: pointer; }
+.swatches { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; flex: 1; }
+.swatches button { padding: 0; height: 15px; border-radius: 3px; border: 1px solid rgba(0, 0, 0, 0.15); }
+.swatches button.on { outline: 2px solid var(--accent); outline-offset: 1px; }
+.reset-color { align-self: flex-start; font-size: 11px; }
+.grid2 .swatches { grid-template-columns: repeat(4, 1fr); }

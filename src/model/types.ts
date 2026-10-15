@@ -15,6 +15,8 @@ export interface Opening {
   height: number;
   /** Height of the bottom edge above the floor: 0 for doors, the sill for windows. */
   sill: number;
+  /** Door leaf / window frame colour. */
+  color: string;
   hinge: 'start' | 'end';
   swing: 'in' | 'out';
 }
@@ -31,6 +33,8 @@ export interface FurnitureItem {
   height: number;
   /** Height of the item's underside above the floor: 0 for free-standing, more for wall-mounted. */
   elevation: number;
+  /** Main colour (fabric, top, body…); details keep their own colours. */
+  color: string;
   rotation: number;
   locked?: boolean;
 }
@@ -41,6 +45,8 @@ export interface Room {
   /** Floor-to-ceiling height. */
   height: number;
   wallThickness: number;
+  wallColor: string;
+  floorColor: string;
 }
 
 export interface Design {
@@ -59,6 +65,8 @@ export interface Settings {
   showNames: boolean;
   showClearances: boolean;
   showClashes: boolean;
+  /** Tint plan symbols and the floor with their colours. */
+  colorPlan: boolean;
 }
 
 export type Selection = { kind: 'items'; ids: string[] } | { kind: 'opening'; id: string } | null;

@@ -34,6 +34,7 @@ const TOGGLES: { key: keyof Settings; label: string }[] = [
   { key: 'showNames', label: 'Names' },
   { key: 'showClearances', label: 'Clearances' },
   { key: 'showClashes', label: 'Clash warnings' },
+  { key: 'colorPlan', label: 'Colours on plan' },
 ];
 
 export function Toolbar({

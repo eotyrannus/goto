@@ -1,5 +1,6 @@
 import type { Design, FurnitureItem, Opening } from './types';
 import { CATALOG_BY_TYPE, OPENING_BY_KIND } from './catalog';
+import { ROOM_COLORS } from './color';
 import { DEFAULT_ROOM_HEIGHT } from './normalize';
 import { uid } from './units';
 
@@ -7,12 +8,12 @@ import { uid } from './units';
 
 function item(type: string, x: number, y: number, rotation = 0, size?: [number, number]): FurnitureItem {
   const c = CATALOG_BY_TYPE[type];
-  return { id: uid(), type, x, y, rotation, width: size?.[0] ?? c.width, depth: size?.[1] ?? c.depth, height: c.height, elevation: c.elevation };
+  return { id: uid(), type, x, y, rotation, width: size?.[0] ?? c.width, depth: size?.[1] ?? c.depth, height: c.height, elevation: c.elevation, color: c.color };
 }
 
 function opening(kind: Opening['kind'], wall: Opening['wall'], offset: number, width: number, extra: Partial<Opening> = {}): Opening {
-  const { height, sill } = OPENING_BY_KIND[kind];
-  return { id: uid(), kind, wall, offset, width, height, sill, hinge: 'start', swing: 'in', ...extra };
+  const { height, sill, color } = OPENING_BY_KIND[kind];
+  return { id: uid(), kind, wall, offset, width, height, sill, color, hinge: 'start', swing: 'in', ...extra };
 }
 
 export function newDesign(name: string, width = 3000, depth = 2500, parts: Partial<Design> = {}): Design {
@@ -20,7 +21,7 @@ export function newDesign(name: string, width = 3000, depth = 2500, parts: Parti
     id: uid(),
     name,
     updatedAt: Date.now(),
-    room: { width, depth, height: DEFAULT_ROOM_HEIGHT, wallThickness: 100 },
+    room: { width, depth, height: DEFAULT_ROOM_HEIGHT, wallThickness: 100, wallColor: ROOM_COLORS.wall, floorColor: ROOM_COLORS.floor },
     openings: [],
     items: [],
     ...parts,

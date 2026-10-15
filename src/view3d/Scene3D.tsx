@@ -9,15 +9,15 @@ import { findIssues } from '../model/clashes';
 import { furnitureParts, type Part } from '../model/furniture3d';
 import { itemBounds, openingFrame, frameToWorld } from '../model/geometry';
 import type { Design, FurnitureItem, Opening, OpeningKind, Room, Wall } from '../model/types';
-import { doorLeafSegments, wallBlocks, type Block } from '../model/walls3d';
+import { DOOR_OPEN, doorLeafSegments, wallBlocks, type Block } from '../model/walls3d';
 import { useDesign } from '../store/designStore';
 import { scene3dApi } from './api';
+import { useDoors } from './doors';
 import { attach, detach } from './bridge';
 
 // Plan millimetres → three.js metres. Plan x → X, plan y → Z, height → Y (up).
 const M = 0.001;
 const ACCENT = '#2563eb';
-const WALL = '#f3f1ec';
 const WALL_TOP = '#3a3a3a';
 
 type Mode = 'orbit' | 'walk';
@@ -63,8 +63,13 @@ function blockProps(b: Pick<Block, 'x0' | 'x1' | 'y0' | 'y1' | 'z0' | 'z1'>) {
 const WALLS: Wall[] = ['top', 'right', 'bottom', 'left'];
 
 // BoxGeometry face order: +x, -x, +y (top), -y, +z, -z. Wall tops are dark, like the plan's poché.
-const WALL_SIDE = new THREE.MeshStandardMaterial({ color: WALL, roughness: 0.95 });
-const WALL_MATS = [WALL_SIDE, WALL_SIDE, new THREE.MeshStandardMaterial({ color: WALL_TOP, roughness: 0.9 }), WALL_SIDE, WALL_SIDE, WALL_SIDE];
+const WALL_TOP_MAT = new THREE.MeshStandardMaterial({ color: WALL_TOP, roughness: 0.9 });
+function useWallMaterials(color: string) {
+  return useMemo(() => {
+    const side = new THREE.MeshStandardMaterial({ color, roughness: 0.95 });
+    return [side, side, WALL_TOP_MAT, side, side, side];
+  }, [color]);
+}
 
 /** Walls cut down to this height when they stand between the camera and the room. */
 const STUB = 120;
@@ -97,6 +102,7 @@ function Room3D({ design, mode }: { design: Design; mode: Mode }) {
   const { room, openings } = design;
   const blocks = useMemo(() => wallBlocks(room, openings), [room, openings]);
   const groups = useRef<Record<string, THREE.Group | null>>({});
+  const wallMats = useWallMaterials(room.wallColor);
   const W = room.width * M;
   const D = room.depth * M;
   const H = room.height * M;
@@ -112,7 +118,7 @@ function Room3D({ design, mode }: { design: Design; mode: Mode }) {
       </mesh>
       <mesh rotation-x={-Math.PI / 2} position={[W / 2, 0, D / 2]} receiveShadow>
         <planeGeometry args={[W, D]} />
-        <meshStandardMaterial color="#e6dac6" roughness={0.9} />
+        <meshStandardMaterial color={room.floorColor} roughness={0.9} />
       </mesh>
       <mesh rotation-x={Math.PI / 2} position={[W / 2, H, D / 2]}>
         <planeGeometry args={[W, D]} />
@@ -125,7 +131,7 @@ function Room3D({ design, mode }: { design: Design; mode: Mode }) {
             {blocks
               .filter((b) => b.wall === w)
               .map((b, i) => (
-                <mesh key={i} geometry={BOX} material={WALL_MATS} {...blockProps(b)} castShadow receiveShadow />
+                <mesh key={i} geometry={BOX} material={wallMats} {...blockProps(b)} castShadow receiveShadow />
               ))}
             {openings
               .filter((o) => o.wall === w && o.kind !== 'door' && o.kind !== 'double-door')
@@ -137,7 +143,7 @@ function Room3D({ design, mode }: { design: Design; mode: Mode }) {
             {stubs
               .filter((b) => b.wall === w)
               .map((b, i) => (
-                <mesh key={i} geometry={BOX} material={WALL_MATS} {...blockProps(b)} receiveShadow />
+                <mesh key={i} geometry={BOX} material={wallMats} {...blockProps(b)} receiveShadow />
               ))}
           </group>
         </group>
@@ -175,44 +181,92 @@ function Opening3D({ room, o }: { room: Room; o: Opening }) {
       <group>
         <mesh geometry={BOX} material={GLASS} {...blockProps(glass)} />
         {pieces.map((p, i) => (
-          <mesh key={i} geometry={BOX} material={material('#ffffff')} {...blockProps({ ...p, ...(horizontal ? { y0: (span.y0 + span.y1) / 2 - 30, y1: (span.y0 + span.y1) / 2 + 30 } : { x0: (span.x0 + span.x1) / 2 - 30, x1: (span.x0 + span.x1) / 2 + 30 }) })} castShadow />
+          <mesh key={i} geometry={BOX} material={material(o.color)} {...blockProps({ ...p, ...(horizontal ? { y0: (span.y0 + span.y1) / 2 - 30, y1: (span.y0 + span.y1) / 2 + 30 } : { x0: (span.x0 + span.x1) / 2 - 30, x1: (span.x0 + span.x1) / 2 + 30 }) })} castShadow />
         ))}
       </group>
     );
   }
 
-  if (o.kind === 'sliding-door') {
-    const panel = (from: number, to: number, depthFrom: number, depthTo: number) => {
-      const p1 = frameToWorld(f, { x: o.width * from, y: -t * depthFrom });
-      const p2 = frameToWorld(f, { x: o.width * to, y: -t * depthTo });
-      return { x0: Math.min(p1.x, p2.x), x1: Math.max(p1.x, p2.x), y0: Math.min(p1.y, p2.y), y1: Math.max(p1.y, p2.y), z0: 0, z1: o.height };
-    };
-    return (
-      <group>
-        <mesh geometry={BOX} material={material('#d8c3a0')} {...blockProps(panel(0, 0.55, 0.7, 0.5))} castShadow />
-        <mesh geometry={BOX} material={material('#d8c3a0')} {...blockProps(panel(0.45, 1, 0.5, 0.3))} castShadow />
-      </group>
-    );
-  }
-
-  if (o.kind === 'door' || o.kind === 'double-door') {
-    return (
-      <group>
-        {doorLeafSegments(room, o).map((leaf, i) => {
-          const dx = leaf.end.x - leaf.hinge.x;
-          const dy = leaf.end.y - leaf.hinge.y;
-          const len = Math.hypot(dx, dy);
-          return (
-            <group key={i} position={[((leaf.hinge.x + leaf.end.x) / 2) * M, 0, ((leaf.hinge.y + leaf.end.y) / 2) * M]} rotation-y={-Math.atan2(dy, dx)}>
-              <mesh geometry={BOX} material={material('#d8c3a0')} position={[0, ((o.height - 10) / 2) * M, 0]} scale={[len * M, (o.height - 10) * M, 40 * M]} castShadow />
-              <mesh geometry={BOX} material={material('#5b5b5b')} position={[len * 0.38 * M, 1.0, 0]} scale={[0.12, 0.02, 0.07]} />
-            </group>
-          );
-        })}
-      </group>
-    );
-  }
+  if (o.kind === 'sliding-door' || o.kind === 'door' || o.kind === 'double-door') return <Door3D room={room} o={o} />;
   return null;
+}
+
+/** Ease a value towards a target each frame (doors swing rather than snap). */
+function useEased(target: number) {
+  const value = useRef(target);
+  return (dt: number) => {
+    value.current += (target - value.current) * Math.min(1, dt * 7);
+    if (Math.abs(target - value.current) < 0.001) value.current = target;
+    return value.current;
+  };
+}
+
+/** Hinged or sliding door that opens and closes when clicked (in orbit and walk modes). */
+function Door3D({ room, o }: { room: Room; o: Opening }) {
+  const shut = useDoors((s) => !!s.shut[o.id]);
+  const toggle = useDoors((s) => s.toggle);
+  const step = useEased(shut ? 0 : 1);
+  const leaves = useRef<(THREE.Group | null)[]>([]);
+  const sliding = useRef<THREE.Mesh>(null);
+  const t = room.wallThickness;
+  const f = openingFrame(room, o);
+  const mat = material(o.color);
+
+  useFrame((_, dt) => {
+    const amount = step(dt);
+    if (o.kind === 'sliding-door') {
+      // The inner panel slides along the wall behind the fixed one.
+      const shift = 0.45 * amount;
+      const a = frameToWorld(f, { x: o.width * shift, y: -t * 0.7 });
+      const b = frameToWorld(f, { x: o.width * (0.55 + shift), y: -t * 0.5 });
+      const p = blockProps({ x0: Math.min(a.x, b.x), x1: Math.max(a.x, b.x), y0: Math.min(a.y, b.y), y1: Math.max(a.y, b.y), z0: 0, z1: o.height });
+      sliding.current?.position.set(...p.position);
+      sliding.current?.scale.set(...p.scale);
+      return;
+    }
+    doorLeafSegments(room, o, amount * DOOR_OPEN).forEach((leaf, i) => {
+      const g = leaves.current[i];
+      if (!g) return;
+      g.position.set(leaf.hinge.x * M, 0, leaf.hinge.y * M);
+      g.rotation.y = -Math.atan2(leaf.end.y - leaf.hinge.y, leaf.end.x - leaf.hinge.x);
+    });
+  });
+
+  const handlers = {
+    onClick: (e: ThreeEvent<MouseEvent>) => {
+      if (e.delta > 5) return;
+      e.stopPropagation();
+      toggle(o.id);
+    },
+    onPointerOver: (e: ThreeEvent<PointerEvent>) => {
+      e.stopPropagation();
+      document.body.style.cursor = 'pointer';
+    },
+    onPointerOut: () => (document.body.style.cursor = ''),
+  };
+
+  if (o.kind === 'sliding-door') {
+    const fixedA = frameToWorld(f, { x: o.width * 0.45, y: -t * 0.5 });
+    const fixedB = frameToWorld(f, { x: o.width, y: -t * 0.3 });
+    const fixed = { x0: Math.min(fixedA.x, fixedB.x), x1: Math.max(fixedA.x, fixedB.x), y0: Math.min(fixedA.y, fixedB.y), y1: Math.max(fixedA.y, fixedB.y), z0: 0, z1: o.height };
+    return (
+      <group name={`door-${o.id}`} {...handlers}>
+        <mesh geometry={BOX} material={mat} {...blockProps(fixed)} castShadow />
+        <mesh ref={sliding} geometry={BOX} material={mat} castShadow />
+      </group>
+    );
+  }
+  const len = o.kind === 'double-door' ? o.width / 2 : o.width;
+  return (
+    <group name={`door-${o.id}`} {...handlers}>
+      {doorLeafSegments(room, o).map((_, i) => (
+        <group key={i} ref={(g) => void (leaves.current[i] = g)}>
+          <mesh geometry={BOX} material={mat} position={[(len / 2) * M, ((o.height - 10) / 2) * M, 0]} scale={[len * M, (o.height - 10) * M, 40 * M]} castShadow />
+          <mesh geometry={BOX} material={material('#5b5b5b')} position={[len * 0.88 * M, 1.0, 0]} scale={[0.12, 0.02, 0.07]} />
+        </group>
+      ))}
+    </group>
+  );
 }
 
 // ---------- furniture ----------
@@ -241,7 +295,10 @@ const Item3D = memo(function Item3D({
   hovered: boolean;
   interactive: boolean;
 }) {
-  const parts = useMemo(() => furnitureParts(it.type, it.width, it.depth, it.height), [it.type, it.width, it.depth, it.height]);
+  const parts = useMemo(
+    () => furnitureParts(it.type, it.width, it.depth, it.height, it.color, CATALOG_BY_TYPE[it.type]?.color),
+    [it.type, it.width, it.depth, it.height, it.color],
+  );
   const s = useDesign.getState;
   const onClick = (e: ThreeEvent<MouseEvent>) => {
     if (!interactive || e.delta > 5) return;

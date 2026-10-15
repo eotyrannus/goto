@@ -21,12 +21,14 @@ Designs are saved in the browser *for this exact address*, so always open http:/
 - **Furniture:** 25 plan symbols across six groups (work, meeting, lounge, storage, fixtures, decor). Drag one from the catalog or click to drop it in the middle of the room.
   - Moving snaps to walls, other items' edges and centres, and the grid. Hold Alt to place freely.
   - Resize and rotate with the handles (rotation snaps to 45°), or type exact values. Each item type has its own size limits.
+- **Colours:** every item, door and window has a colour, and the room has wall and floor colours. Use the picker or swatches in the side panel, or *Reset to default colour*. Selecting several items recolours them together. Colours show fully in 3D and as soft tints on the plan (View → Colours on plan).
 - **Planning aids:** distances from the selected item to each wall, and red highlights for items that overlap, stick out of the room, block a door swing or are taller than the ceiling.
 - **Editing:** multi-select (Shift-click or drag a box), duplicate, copy/paste, lock, front/back ordering, and undo/redo for every change.
 - **Saving:** autosaves as you work. *Designs* lists saved plans with thumbnails and offers starter templates (Focus pod, Duo pod, Meeting pod, Lounge).
 - **3D view:** switch between *Plan* and *3D* in the toolbar. The 3D view updates live as you edit and only loads the first time you open it.
   - Orbit, pan and zoom. Walls between you and the room drop to low stubs so you can see in. *Fit* and *Top* reset the camera.
   - Click to select, then edit in the side panel. Drag catalog items onto the 3D floor to add them.
+  - Click a door to open or close it (sliding doors slide). This works in walk mode too. Door state is a viewing aid and isn't saved with the design.
   - *Walk* puts you inside at eye height: drag to look, W A S D or the arrow keys to move, Shift to go faster, Esc to stop. Walls and furniture block you.
 - **Export:** PNG or JPEG of the plan with a title block and scale bar. From the 3D view: a PNG of the current view, or a `.glb` 3D model for other 3D apps. Also `.pod.json` design files for backup or sharing (Export → Import design file).
 

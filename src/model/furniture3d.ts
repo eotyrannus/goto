@@ -1,3 +1,5 @@
+import { shade } from './color';
+
 // Low-poly 3D furniture built from boxes, cylinders and spheres, parameterised by an item's
 // width (w, local x), depth (d, local y, +y is the front) and height (h, z up). Coordinates are
 // millimetres in the item's local frame with the origin at the centre of its footprint on the
@@ -35,6 +37,7 @@ export const COLORS = {
   rug: '#b9a3c4',
   felt: '#a7a196',
   shade: '#fbf3dd',
+  door: '#d8c3a0',
 };
 
 const box = (x: number, y: number, z: number, sx: number, sy: number, sz: number, color: string, extra: Partial<Part> = {}): Part => ({
@@ -329,9 +332,26 @@ const BUILDERS: Record<string, (w: number, d: number, h: number) => Part[]> = {
   rug,
 };
 
-export function furnitureParts(type: string, w: number, d: number, h: number): Part[] {
+/** Colours derived from an item's main colour (sofa cushions, the rug's centre panel). */
+const DERIVED: Record<string, number> = {
+  '#9db0c2': 0.18, // sofa cushions: a lighter shade
+  '#a58fb3': -0.1, // rug centre panel: a darker shade
+};
+
+/**
+ * Parts for an item. `color` recolours the item's main parts — those drawn in its catalog
+ * default colour `main` — and the details derived from it; other details keep their colours.
+ */
+export function furnitureParts(type: string, w: number, d: number, h: number, color?: string, main?: string): Part[] {
   const build = BUILDERS[type];
-  const parts = build ? build(w, d, h) : [box(0, 0, h / 2, w, d, h, COLORS.white)];
+  let parts = build ? build(w, d, h) : [box(0, 0, h / 2, w, d, h, COLORS.white)];
+  if (color && main && color.toLowerCase() !== main.toLowerCase()) {
+    parts = parts.map((p) => {
+      if (p.color.toLowerCase() === main.toLowerCase()) return { ...p, color };
+      const amount = DERIVED[p.color.toLowerCase()];
+      return amount !== undefined ? { ...p, color: shade(color, amount) } : p;
+    });
+  }
   // Odd proportions can push a detail to zero size or below the floor; keep every part solid and grounded.
   return parts.map((p) => {
     const sx = Math.max(p.sx, 1);
